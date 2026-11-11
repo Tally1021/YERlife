@@ -1,0 +1,6 @@
+.env
+.izohlar.json
+data.backup*.json
+data.json.tmp
+*.bak
+node_modules/

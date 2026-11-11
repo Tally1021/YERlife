@@ -1,6 +1,6 @@
 // Izohlar shaharchasi: har bir izoh yozgan odamga — nik yozilgan bitta o'tov
 import * as THREE from 'three';
-import { box, cyl, cone, merge, inst, compose, strHash, signTex } from './util.js';
+import { box, cyl, cone, merge, inst, compose, strHash, signTex, ZERO } from './util.js';
 import { yurtPos } from './layout.js';
 
 const FELT = ['#f4efe2', '#efe6d2', '#f7f3ea', '#e9dfc8', '#f1ead9'];
@@ -28,29 +28,54 @@ const fixedGeo = merge([
   box(1.4, .18, .3, 0, 1.68, 2.27, '#c79a3a'),
 ]);
 
+// Uzoqdan ko'rinadigan soddalashtirilgan o'tov (LOD): kam uchburchak, soyasiz
+const farGeo = merge([
+  cyl(2.3, 2.3, 1.9, 0, 0, 0, '#ffffff', 8),
+  cone(2.62, 1.45, 0, 1.9, 0, '#ffffff', 8),
+  box(1.1, 1.5, .2, 0, .1, 2.2, '#8a5a34'),
+]);
+const NEAR_MAX = 220; // to'liq ko'rinishdagi o'tovlar soni (eng yaqinlari)
+
 export class Yurts {
-  constructor(scene) { this.scene = scene; this.list = []; this.meshes = []; }
+  constructor(scene) { this.scene = scene; this.list = []; this.meshes = []; this.shown = []; }
   build(items, info) {
     for (const m of this.meshes) { this.scene.remove(m); m.dispose(); }
     const live = []; items.forEach((x, j) => { if (x && x.n && !x.d) live.push(j); });
-    const n = Math.max(1, live.length), mat = () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9 });
-    this.felt = inst(feltGeo, mat(), n); this.acc = inst(accentGeo, mat(), n); this.fixed = inst(fixedGeo, mat(), n);
-    this.meshes = [this.felt, this.acc, this.fixed]; this.meshes.forEach(m => this.scene.add(m));
-    this.list = []; this.byJ = new Map(); const c = new THREE.Color();
+    const n = Math.max(1, live.length), nn = Math.min(n, NEAR_MAX), mat = () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9 });
+    this.far = inst(farGeo, mat(), n, { shadow: false });
+    this.felt = inst(feltGeo, mat(), nn); this.acc = inst(accentGeo, mat(), nn); this.fixed = inst(fixedGeo, mat(), nn);
+    this.nearM = [this.felt, this.acc, this.fixed]; for (const m of this.nearM) { m.count = 0; m.frustumCulled = false; }
+    this.meshes = [this.far, ...this.nearM]; this.meshes.forEach(m => this.scene.add(m));
+    this.list = []; this.byJ = new Map(); this.shown = []; const c = new THREE.Color();
     live.forEach((j, k) => {
       const p = yurtPos(j, info.com), h = strHash(items[j].n), s = .92 + (h % 17) / 100;
-      const t = { j, k, x: p.x, z: p.z, rot: p.rot, s, n: items[j].n, felt: FELT[h % FELT.length], acc: ACCENT[(h >>> 5) % ACCENT.length] };
-      const M = compose(p.x, 0, p.z, p.rot, s, s, s);
-      for (const m of this.meshes) m.setMatrixAt(k, M);
-      this.felt.setColorAt(k, c.set(t.felt)); this.acc.setColorAt(k, c.set(t.acc));
+      const t = { j, k, x: p.x, z: p.z, rot: p.rot, s, n: items[j].n, felt: FELT[h % FELT.length], acc: ACCENT[(h >>> 5) % ACCENT.length], hl: false };
+      this.far.setMatrixAt(k, compose(p.x, 0, p.z, p.rot, s, s, s)); this.far.setColorAt(k, c.set(t.felt));
       this.list.push(t); this.byJ.set(j, t);
     });
-    for (const m of this.meshes) { m.count = live.length; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; m.computeBoundingSphere(); }
+    this.far.count = live.length; this.far.instanceMatrix.needsUpdate = true; if (this.far.instanceColor) this.far.instanceColor.needsUpdate = true; this.far.computeBoundingSphere();
   }
-  near(fx, fz, R) { const R2 = R * R; return this.list.filter(t => (t.x - fx) ** 2 + (t.z - fz) ** 2 < R2).sort((a, b) => ((a.x - fx) ** 2 + (a.z - fz) ** 2) - ((b.x - fx) ** 2 + (b.z - fz) ** 2)); }
+  // yaqin o'tovlar ro'yxati (yaqindan uzoqqa) + LOD: eng yaqinlari to'liq, qolganlari sodda ko'rinishda
+  near(fx, fz, R) {
+    const R2 = R * R, out = R > 0 ? this.list.filter(t => (t.x - fx) ** 2 + (t.z - fz) ** 2 < R2).sort((a, b) => ((a.x - fx) ** 2 + (a.z - fz) ** 2) - ((b.x - fx) ** 2 + (b.z - fz) ** 2)) : [];
+    if (!this.far) return out;
+    const want = out.slice(0, this.felt.instanceMatrix.count), c = new THREE.Color();
+    if (want.length === this.shown.length && want.every((t, i) => t === this.shown[i])) return out;
+    for (const t of this.shown) this.far.setMatrixAt(t.k, compose(t.x, 0, t.z, t.rot, t.s, t.s, t.s));
+    want.forEach((t, i) => {
+      this.far.setMatrixAt(t.k, ZERO); const M = compose(t.x, 0, t.z, t.rot, t.s, t.s, t.s);
+      for (const m of this.nearM) m.setMatrixAt(i, M);
+      this.felt.setColorAt(i, c.set(t.hl ? '#ffe680' : t.felt)); this.acc.setColorAt(i, c.set(t.hl ? '#ffc400' : t.acc)); this.fixed.setColorAt(i, c.set('#ffffff'));
+    });
+    for (const m of this.nearM) { m.count = want.length; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    this.far.instanceMatrix.needsUpdate = true; this.shown = want;
+    return out;
+  }
   highlight(j, on) {
-    const t = this.byJ.get(j); if (!t) return; const c = new THREE.Color();
-    this.felt.setColorAt(t.k, c.set(on ? '#ffe680' : t.felt)); this.acc.setColorAt(t.k, c.set(on ? '#ffc400' : t.acc));
+    const t = this.byJ.get(j); if (!t) return; const c = new THREE.Color(); t.hl = on;
+    this.far.setColorAt(t.k, c.set(on ? '#ffd23a' : t.felt)); this.far.instanceColor.needsUpdate = true;
+    const i = this.shown.indexOf(t); if (i < 0) return;
+    this.felt.setColorAt(i, c.set(on ? '#ffe680' : t.felt)); this.acc.setColorAt(i, c.set(on ? '#ffc400' : t.acc));
     this.felt.instanceColor.needsUpdate = this.acc.instanceColor.needsUpdate = true;
   }
 }

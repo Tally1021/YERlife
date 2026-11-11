@@ -329,7 +329,7 @@ function nearTick(force) {
   for (let c = 20; c < crowd.cap; c++) crowd.hide(c);
   nearRes.filter(i => !(mode !== 'top' && i === me)).slice(0, crowd.cap - 20).forEach((i, n) => { const s = slot(i); crowd.set(20 + n, s.x + s.fx * 1.3 - s.fz * 1.5, s.z + s.fz * 1.3 + s.fx * 1.5, s.rot, lookOf(i), 0); });
   nearTrees = treeSys.updateLOD(fx, fz, mode === 'top' && camd > 420 ? 0 : 110);
-  nearYurts = mode === 'top' && camd > 420 ? [] : yurtSys.near(fx, fz, 110);
+  nearYurts = yurtSys.near(fx, fz, mode === 'top' && camd > 420 ? 0 : 110);
   crowd.commit();
 }
 
@@ -496,12 +496,12 @@ const clock = new THREE.Clock(); let tAcc = 0;
 const Qual = { ms: 16, n: 0, step: 0, pr: Math.min(devicePixelRatio, isMobile ? 1.5 : 2) };
 function autoQuality(rawDt) {
   if (document.hidden || rawDt > 1) return; Qual.ms += (rawDt * 1000 - Qual.ms) * .05;
-  if (++Qual.n < 90) return; // har ~90 kadrda bir marta qaror
-  Qual.n = 0; if (Qual.ms < 36 || Qual.step >= 4) return; Qual.step++;
-  if (Qual.step === 1) renderer.setPixelRatio(Math.min(Qual.pr, 1));
-  else if (Qual.step === 2) { renderer.shadowMap.type = THREE.PCFShadowMap; sunL.shadow.mapSize.set(1024, 1024); if (sunL.shadow.map) { sunL.shadow.map.dispose(); sunL.shadow.map = null; } scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; }); }
-  else if (Qual.step === 3) renderer.setPixelRatio(.75);
-  else { sunL.castShadow = false; renderer.shadowMap.enabled = false; scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; }); }
+  if (++Qual.n < (Qual.ms > 50 ? 30 : 90)) return; // sekin qurilmada tezroq qaror
+  Qual.n = 0; if (Qual.ms < 36 || Qual.step >= 3) return; Qual.step++;
+  if (Qual.step === 1 && Qual.pr <= 1) Qual.step = 2; // aniqlik allaqachon past — keyingi bosqichga
+  if (Qual.step === 1) renderer.setPixelRatio(1);
+  else if (Qual.step === 2) { sunL.castShadow = false; renderer.shadowMap.enabled = false; scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; }); } // soyalar — eng og'ir qism
+  else renderer.setPixelRatio(.75);
   Qual.ms = 16; console.log('Avto-sifat bosqichi:', Qual.step);
 }
 function tick() {

@@ -213,14 +213,25 @@ export const TOPH = [4.9, 8, 24.8, 14.6, 47.6];
 const FLIPM = new THREE.Matrix4().makeRotationZ(Math.PI);
 export const LEVEL_GEO = [level0(), level1(), level2(), level3(), level4()];
 
-// Hovli devori va darvoza (faqat yaqindagi uylar uchun)
+// Hovli panjarasi (reshotka) va darvoza — faqat yaqindagi uylar uchun
+const YARD_L = SPACING - .8, SIDE_L = 7.5, IRON = '#2a2e33', TIP = '#e6c25a';
 export function yardGeo() {
-  const L = SPACING - .8, gap = 1.9, seg = (L - gap) / 2;
-  const wall = merge([box(seg, 1.35, .25, -(gap / 2 + seg / 2), 0, 0, '#ffffff'), box(seg, 1.35, .25, gap / 2 + seg / 2, 0, 0, '#ffffff'), box(seg + .1, .12, .35, -(gap / 2 + seg / 2), 1.35, 0, '#d9d2c4'), box(seg + .1, .12, .35, gap / 2 + seg / 2, 1.35, 0, '#d9d2c4'), box(.4, 1.8, .4, -gap / 2 - .2, 0, 0, '#cfc6b6'), box(.4, 1.8, .4, gap / 2 + .2, 0, 0, '#cfc6b6')]);
+  const L = YARD_L, gap = 1.9, seg = (L - gap) / 2 - .4, P = [];
+  for (const s of [-1, 1]) {
+    const cx = s * (gap / 2 + .4 + seg / 2);
+    P.push(box(seg, .3, .22, cx, 0, 0, '#ffffff'), box(seg, .05, .05, cx, .48, 0, IRON), box(seg, .05, .05, cx, 1.45, 0, IRON));
+    P.push(box(.4, 1.9, .4, s * (gap / 2 + .2), 0, 0, '#ffffff'), box(.5, .1, .5, s * (gap / 2 + .2), 1.9, 0, '#d9d2c4'), box(.32, 1.7, .32, s * L / 2, 0, 0, '#ffffff'), box(.4, .08, .4, s * L / 2, 1.7, 0, '#d9d2c4'));
+    const n = Math.max(2, Math.round(seg / .48));
+    for (let i = 0; i < n; i++) { const x = cx - seg / 2 + (i + .5) * seg / n; P.push(box(.045, 1.3, .045, x, .3, 0, IRON), cone(.05, .16, x, 1.6, 0, TIP, 4)); }
+  }
+  const wall = merge(P);
   const gate = merge([box(gap * .48, 1.6, .06, -gap / 4 - .02, 0, .05, '#ffffff', -.6), box(gap * .48, 1.6, .06, gap / 4 + .02, 0, .05, '#ffffff', .6)]);
-  return { wall, gate };
+  // yon/orqa panjara bo'lagi: lokal z bo'ylab 0 dan -SIDE_L gacha (uzunligi masshtab bilan moslanadi)
+  const S = [box(.2, .3, SIDE_L, 0, 0, -SIDE_L / 2, '#ffffff'), box(.05, .05, SIDE_L, 0, .48, -SIDE_L / 2, IRON), box(.05, .05, SIDE_L, 0, 1.45, -SIDE_L / 2, IRON), box(.3, 1.7, .3, 0, 0, -SIDE_L, '#ffffff'), box(.38, .08, .38, 0, 1.7, -SIDE_L, '#d9d2c4')];
+  const ns = Math.round(SIDE_L / .6);
+  for (let i = 0; i < ns; i++) { const z = -(i + .5) * SIDE_L / ns; S.push(box(.045, 1.3, .045, 0, .3, z, IRON), cone(.05, .16, 0, 1.6, z, TIP, 4)); }
+  return { wall, gate, side: merge(S) };
 }
-
 export const WALLC = ['#f3e9d6', '#efe2c4', '#e8d3b5', '#f5f1ea', '#e9cfae', '#dfe3da', '#f0dcc8', '#e6d9c3', '#d9c2a3', '#f2e6c9', '#e3eef0', '#f0e1e6'];
 export const ROOFC = ['#a2482e', '#8f3d26', '#b55a37', '#6d4637', '#5a5f66', '#7b3a2b', '#3f6b4f', '#4f5a78'];
 export const GATEC = ['#3f6b4f', '#4f5a78', '#7b3a2b', '#2f5f6e', '#6b5a3a', '#55606a'];
@@ -302,19 +313,28 @@ export class Buildings {
 // Yaqin uylar uchun hovli devorlari pul'i
 export class YardPool {
   constructor(scene, cap = 420) {
-    const { wall, gate } = yardGeo();
-    this.wall = inst(wall, MAT.trim, cap); this.gate = inst(gate, new THREE.MeshStandardMaterial({ vertexColors: true, metalness: .4, roughness: .5 }), cap);
-    scene.add(this.wall, this.gate); this.cap = cap;
+    const { wall, gate, side } = yardGeo();
+    this.wall = inst(wall, MAT.trim, cap, { shadow: false }); this.gate = inst(gate, new THREE.MeshStandardMaterial({ vertexColors: true, metalness: .4, roughness: .5 }), cap);
+    this.side = inst(side, MAT.trim, cap * 3, { shadow: false });
+    scene.add(this.wall, this.gate, this.side); this.cap = cap;
   }
   set(list, residents, slotOf) { // list: rezident indekslari
-    const col = new THREE.Color(); let n = 0;
+    const col = new THREE.Color(); let n = 0, k = 0;
     for (const ri of list) {
-      const r = residents[ri]; if (!r || (r.l | 0) > 1 || n >= this.cap) continue;
-      const s = slotOf(ri), x = s.x + s.fx * 2.5, z = s.z + s.fz * 2.5, h = strHash(r.n);
+      const r = residents[ri]; if (!r || n >= this.cap) continue;
+      const L = Math.min(4, r.l | 0), s = slotOf(ri), x = s.x + s.fx * 2.5, z = s.z + s.fz * 2.5, h = strHash(r.n);
       this.wall.setMatrixAt(n, compose(x, 0, z, s.rot)); this.gate.setMatrixAt(n, compose(x, 0, z, s.rot));
-      this.wall.setColorAt(n, col.set(WALLC[(h >>> 3) % WALLC.length])); this.gate.setColorAt(n, col.set(GATEC[(h >>> 6) % GATEC.length]));
+      this.gate.setColorAt(n, col.set(GATEC[(h >>> 6) % GATEC.length])); this.wall.setColorAt(n, col.set(WALLC[(h >>> 3) % WALLC.length]));
       n++;
+      if (L === 3) continue; // qasr o'z devorlari bilan — faqat old panjara
+      // yon va orqa panjara: uy atrofini o'rab oladi
+      const lx = Math.cos(s.rot), lz = -Math.sin(s.rot), dep = 2.5 + DIMS[L].d + 1.2, hw = YARD_L / 2, bx = s.x - s.fx * (DIMS[L].d + 1.2), bz = s.z - s.fz * (DIMS[L].d + 1.2);
+      this.side.setMatrixAt(k, compose(x + lx * hw, 0, z + lz * hw, s.rot, 1, 1, dep / SIDE_L)); this.side.setColorAt(k++, col);
+      this.side.setMatrixAt(k, compose(x - lx * hw, 0, z - lz * hw, s.rot, 1, 1, dep / SIDE_L)); this.side.setColorAt(k++, col);
+      this.side.setMatrixAt(k, compose(bx + lx * hw, 0, bz + lz * hw, s.rot + Math.PI / 2, 1, 1, YARD_L / SIDE_L)); this.side.setColorAt(k++, col);
     }
     for (const m of [this.wall, this.gate]) { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    this.side.count = k; this.side.instanceMatrix.needsUpdate = true; this.side.instanceColor.needsUpdate = true;
   }
 }
+

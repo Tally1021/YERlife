@@ -12,6 +12,9 @@ function flagTex() {
   });
 }
 
+// Hokimiyat hovlisi (binoga nisbatan lokal o'lchamlar): yon chegarasi, orqa va old tomoni, darvoza kengligi
+export const HALL_YARD = { hx: 36, zb: -23, zf: 54, gate: 9 };
+
 export function buildCityHall(info, hokim) {
   const H = info.hok, g = new THREE.Group(); g.position.set(0, 0, H.cz);
   // bino old tomoni +z (shaharga qaragan)
@@ -55,7 +58,7 @@ export function buildCityHall(info, hokim) {
     P2.push(box(10, .5, 14, s * 17, 0, pz + 6 + plazaD / 2, '#8a7a62'), box(9.4, .1, 13.4, s * 17, .45, pz + 6 + plazaD / 2, '#4f8f3a'));
     for (let i = 0; i < 18; i++) { const ic = new THREE.IcosahedronGeometry(.32, 0); ic.translate(s * 17 + ((i % 6) - 2.5) * 1.4, .75, pz + 6 + plazaD / 2 + (Math.floor(i / 6) - 1) * 4); P2.push(part(ic, ['#e53950', '#ffd23f', '#ff8fb1', '#ffffff'][i % 4])); }
   }
-  const poles = [-6, 0, 6].map(x => [x, pz + 6 + plazaD - 3]);
+  const poles = [-11, -8, 8, 11].map(x => [x, pz + 6 + plazaD - 3]);
   for (const [x, z] of poles) P2.push(cyl(.12, .16, 16, x, 0, z, '#d0d4d8', 10), box(.8, .4, .8, x, 0, z, '#9e9a92'));
   const mat = (o = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .75, ...o });
   const add = (geo, m, sh = true) => { const me = new THREE.Mesh(geo, m); me.castShadow = sh; me.receiveShadow = true; g.add(me); return me; };
@@ -71,6 +74,53 @@ export function buildCityHall(info, hokim) {
   board.add(new THREE.Mesh(merge([box(.35, 3.2, .35, -4.6, 0, 0, '#3b3b3b'), box(.35, 3.2, .35, 4.6, 0, 0, '#3b3b3b')]), mat()));
   const bm = new THREE.Mesh(new THREE.PlaneGeometry(10, 3.75), new THREE.MeshStandardMaterial({ map: hokimTex(hokim), side: THREE.DoubleSide })); bm.position.y = 4.9; board.add(bm);
   board.position.set(-14, 0, bz); g.add(board); g.userData.board = bm;
+  // ---------- hovli: temir panjara, tantanali darvoza, qo'riqchilar, chiroqlar, archalar ----------
+  {
+    const Y = HALL_YARD, zf = Y.zf, F = [], GD = [], LG = [], iron = '#22262b', stone = '#e6dfcf', base = '#bdb5a5';
+    const run = (ax, az, bx, bz, pillars = true) => {
+      const L = Math.hypot(bx - ax, bz - az), ry = Math.atan2(bx - ax, bz - az), mx = (ax + bx) / 2, mz = (az + bz) / 2, y0 = pillars ? .5 : .1;
+      if (pillars) {
+        F.push(box(.34, .5, L, mx, 0, mz, base, ry));
+        const np = Math.max(1, Math.round(L / 6));
+        for (let i = 0; i <= np; i++) { const t = i / np, x = ax + (bx - ax) * t, z = az + (bz - az) * t; F.push(box(.62, 2.7, .62, x, .5, z, stone), box(.86, .18, .86, x, 3.2, z, '#cfc6b6')); const s = new THREE.IcosahedronGeometry(.22, 0); s.translate(x, 3.6, z); GD.push(part(s, '#fff')); }
+      }
+      for (const y of [y0 + .25, y0 + 2.15]) F.push(box(.07, .07, L, mx, y, mz, iron, ry));
+      const n = Math.max(2, Math.round(L / .42));
+      for (let i = 0; i < n; i++) { const t = (i + .5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t; F.push(box(.05, 2.3, .05, x, y0, z, iron)); GD.push(cone(.07, .24, x, y0 + 2.3, z, '#fff', 4)); }
+    };
+    const gp = Y.gate / 2 + .8;
+    run(-Y.hx, Y.zb, Y.hx, Y.zb); run(Y.hx, Y.zb, Y.hx, zf); run(-Y.hx, Y.zb, -Y.hx, zf); run(-Y.hx, zf, -gp - .6, zf); run(gp + .6, zf, Y.hx, zf);
+    for (const s of [-1, 1]) {
+      // darvoza ustunlari, fonarlar, ochiq tavaqalar
+      F.push(box(1.9, .6, 1.9, s * gp, 0, zf, base), box(1.5, 5.6, 1.5, s * gp, .6, zf, stone), box(1.9, .3, 1.9, s * gp, 6.2, zf, '#cfc6b6'), box(.16, .5, .16, s * gp, 6.5, zf, iron));
+      F.push(box(1.56, .16, 1.56, s * gp, 2.2, zf, '#163a5f'), box(1.56, .16, 1.56, s * gp, 4.9, zf, '#163a5f'));
+      LG.push(box(.62, .72, .62, s * gp, 7, zf, '#fff')); F.push(box(.8, .1, .8, s * gp, 7.72, zf, iron)); GD.push(cone(.2, .5, s * gp, 7.8, zf, '#fff', 6));
+      run(s * (Y.gate / 2 + .05), zf - .4, s * (Y.gate / 2 + 1.2), zf - 4.6, false);
+      // qo'riqchi budkasi
+      const bx = s * (gp + 3), bz = zf + 1.9;
+      F.push(box(1.8, 2.5, 1.8, bx, 0, bz, '#f4f1ea'), box(1.84, .4, 1.84, bx, 0, bz, '#1f5e3a'), box(1.84, .3, 1.84, bx, 2.2, bz, '#1f5e3a'), box(1, 1.9, .06, bx, .15, bz + .9, '#1b1f24'), box(2.3, .14, 2.3, bx, 2.5, bz, '#163a2a'));
+      const rf = new THREE.ConeGeometry(1.55, .9, 4); rf.rotateY(Math.PI / 4); rf.translate(bx, 3.09, bz); F.push(part(rf, '#1f5e3a'));
+      // hovli chiroqlari
+      for (const lz of [pz + 8, pz + 21, pz + 34]) { F.push(box(.5, .3, .5, s * 9.6, 0, lz, base), cyl(.08, .12, 4.3, s * 9.6, .3, lz, iron, 8), box(.5, .08, .5, s * 9.6, 4.6, lz, iron)); const gl = new THREE.IcosahedronGeometry(.34, 1); gl.translate(s * 9.6, 5, lz); LG.push(part(gl, '#fff')); }
+      // archalar (yon panjara bo'ylab) va skameykalar
+      for (let z = Y.zb + 4; z < zf - 3; z += 7) F.push(cyl(.16, .22, .9, s * (Y.hx - 2.6), 0, z, '#5a3a22', 6), cone(1.25, 5.6, s * (Y.hx - 2.6), .8, z, '#2f6b3a', 8), cone(.9, 2.6, s * (Y.hx - 2.6), 4.4, z, '#377a43', 8));
+      for (const bzz of [pz + 17, pz + 29]) F.push(box(.6, .1, 2.4, s * 24.6, .5, bzz, '#7a5230'), box(.1, .6, 2.4, s * 24.95, .6, bzz, '#7a5230'), box(.5, .5, .12, s * 24.6, 0, bzz - 1, iron), box(.5, .5, .12, s * 24.6, 0, bzz + 1, iron));
+    }
+    for (let x = -Y.hx + 5; x < Y.hx - 3; x += 7) F.push(cyl(.16, .22, .9, x, 0, Y.zb + 2.6, '#5a3a22', 6), cone(1.25, 5.6, x, .8, Y.zb + 2.6, '#2f6b3a', 8), cone(.9, 2.6, x, 4.4, Y.zb + 2.6, '#377a43', 8));
+    // darvoza peshtoqi
+    F.push(box(gp * 2 - 1.4, .9, .5, 0, 5.2, zf, '#163a5f'), box(gp * 2 - 1.4, .1, .58, 0, 5.12, zf, '#e6c25a'), box(gp * 2 - 1.4, .1, .58, 0, 6.08, zf, '#e6c25a'));
+    add(merge(F), mat()); add(merge(GD), new THREE.MeshStandardMaterial({ color: 0xdcb04a, metalness: 1, roughness: .3 }), false);
+    add(merge(LG), mat({ color: 0xfff2c8, emissive: 0xffd27a, emissiveIntensity: 0 }), false).userData.night = 1;
+    const gt = signTex(['HOKIMIYAT'], { bg: '#163a5f', fg: '#f1d27a', border: '#163a5f', w: 1024, h: 110, font: 'bold 84px system-ui' });
+    for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(gp * 2 - 1.8, .74), new THREE.MeshStandardMaterial({ map: gt })); m.position.set(0, 5.65, zf + s * .27); if (s < 0) m.rotation.y = Math.PI; g.add(m); }
+    // qo'riqchilar: darvoza oldida va bino eshigi yonida
+    const capG = merge([box(.4, .13, .38, 0, 1.9, 0, '#16291f'), box(.36, .03, .17, 0, 1.9, .25, '#0e1a14'), box(.1, .07, .02, 0, 1.93, .2, '#e6c25a'), box(.5, .07, .28, 0, .86, 0, '#0e0e0e'), box(.09, .09, .02, 0, .85, .14, '#e6c25a'), box(.12, .03, .2, -.3, 1.44, 0, '#e6c25a'), box(.12, .03, .2, .3, 1.44, 0, '#e6c25a')]);
+    const capM = mat();
+    for (const [x, z] of [[-3.7, zf + 1.4], [3.7, zf + 1.4], [-4.9, pz + 7.7], [4.9, pz + 7.7]]) {
+      const m = makePlayer({ skin: '#dba57d', hair: '#1c1410', shirt: '#1f4d35', pants: '#16291f', girl: false, crown: false, cape: false });
+      m.userData.mark.visible = false; m.add(new THREE.Mesh(capG, capM)); m.position.set(x, 0, z); g.add(m);
+    }
+  }
   return g;
 }
 export function hokimTex(hokim) {

@@ -5,7 +5,7 @@ import { isMobile, windUniform, strHash, rng, compose } from './util.js';
 import { cityInfo, slot, ensureSlots, ringR, ROAD, SIDE, MAHALLA, treePos, yurtPos } from './layout.js';
 import { Yurts, buildComTown } from './yurts.js';
 import { Extras } from './extras.js';
-import { buildCityHall, hokimTex, buildHallInterior } from './civic.js';
+import { buildCityHall, hokimTex, buildHallInterior, HALL_YARD } from './civic.js';
 import { Buildings, YardPool, DIMS, LEVEL_NAMES, setNightBuildings } from './buildings.js';
 import { buildTerrain, SkyBox, Clouds, Trees, buildGarden, bigTree } from './nature.js';
 import { buildRoads, buildLamps, buildMahallaSigns, buildStadium, Cars, setNightCity } from './city.js';
@@ -111,7 +111,10 @@ function build() {
   for (const t of treeSys.list) addObs({ t: 'c', x: t.x, z: t.z, r: .45 * t.s, h: 6, R: 1 });
   for (const t of yurtSys.list) addObs({ t: 'c', x: t.x, z: t.z, r: 2.5 * t.s, h: 3.4, R: 3 });
   addObs({ t: 'c', x: 0, z: 0, r: 1.4, h: 14, R: 2 });
-  { const H = info.hok; addObs({ t: 'box', x: 0, z: H.cz + 3, rot: 0, hw: H.w / 2 + 2, hd: H.d / 2 + 5, h: 30, R: 32 }); addObs({ t: 'c', x: 0, z: H.cz + H.d / 2 + 23, r: 5.4, h: 3, R: 6 }); }
+  { const H = info.hok; addObs({ t: 'box', x: 0, z: H.cz + 3, rot: 0, hw: H.w / 2 + 2, hd: H.d / 2 + 5, h: 30, R: 32 }); addObs({ t: 'c', x: 0, z: H.cz + H.d / 2 + 23, r: 5.4, h: 3, R: 6 });
+    // hovli panjarasi (darvoza ochiq)
+    const Y = HALL_YARD, wall = (x0, z0, x1, z1) => addObs({ t: 'box', x: (x0 + x1) / 2, z: H.cz + (z0 + z1) / 2, rot: 0, hw: Math.abs(x1 - x0) / 2 + .3, hd: Math.abs(z1 - z0) / 2 + .3, h: 3, R: Math.max(Math.abs(x1 - x0), Math.abs(z1 - z0)) / 2 + 1 });
+    wall(-Y.hx, Y.zb, Y.hx, Y.zb); wall(-Y.hx, Y.zb, -Y.hx, Y.zf); wall(Y.hx, Y.zb, Y.hx, Y.zf); wall(-Y.hx, Y.zf, -Y.gate / 2 - .2, Y.zf); wall(Y.gate / 2 + .2, Y.zf, Y.hx, Y.zf); }
   W.st = info.st; nightApply();
   $('nH').textContent = fmt(residents.filter(alive).length); $('nT').textContent = fmt(Math.max(likeTotal, trees.filter(alive).length)); $('nC').textContent = fmt(comments.filter(alive).length);
   nearTick(true);

@@ -48,10 +48,12 @@ export function cityInfo(nRes, nTrees, nCom = 0) {
   const K = lastK + 1;                      // eng tashqi aylana ko'cha indeksi
   const cityR = ringR(K);
   // Layklar bog'i: shahar sharqida (+x)
-  const cols = nTrees > 600 ? 100 : 24, cell = 5;
-  const rows = Math.max(4, Math.ceil(nTrees / cols) + 2);
-  const garden = { x0: cityR + ROAD / 2 + 16, cols, rows, cell, W: cols * cell + 6, Dp: rows * cell + 6 };
-  garden.z0 = -garden.W / 2;
+  // aylana shaklida: daraxtlar markazdan boshlab halqa-halqa ekiladi (darvoza tomonda yo'lak uchun bo'shliq)
+  const cell = 5, R0 = 10, GAP = 5, rings = []; let tot = 0;
+  for (let k = 0; tot < Math.max(40, nTrees) || k < 3; k++) { const r = R0 + k * cell, n = Math.floor((2 * Math.PI * r - GAP) / cell); rings.push({ r, n, start: tot }); tot += n; }
+  const GR = rings[rings.length - 1].r + cell / 2 + 3;
+  const garden = { round: true, x0: cityR + ROAD / 2 + 16, cell, rings, slots: tot, R: GR, gap: GAP, W: GR * 2, Dp: GR * 2 };
+  garden.z0 = -GR; garden.cx = garden.x0 + GR;
   // Stadion: shahar g'arbida (-x)
   const st = { cx: -(cityR + 20 + 52), cz: 0, ax: 46, bz: 60, iax: 25, ibz: 37 };
   // Izohlar shaharchasi: shahar janubida (+z), o'rtasida ko'cha
@@ -64,9 +66,11 @@ export function cityInfo(nRes, nTrees, nCom = 0) {
   return { K, cityR, garden, st, com, hok, flat: far };
 }
 export function treePos(j, g) {
-  const row = Math.floor(j / g.cols), col = j % g.cols;
-  const jx = (Math.sin(j * 12.9898) * 43758.5453 % 1) * .8, jz = (Math.sin(j * 78.233) * 12543.123 % 1) * .8;
-  return { x: g.x0 + 3 + g.cell / 2 + row * g.cell + jx, z: g.z0 + 3 + g.cell / 2 + col * g.cell + jz };
+  let lo = 0, hi = g.rings.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (g.rings[m].start <= j) lo = m; else hi = m - 1; }
+  const R = g.rings[lo], i = Math.min(j - R.start, R.n - 1), d = g.gap / 2 / R.r;                       // d — darvoza yo'lagi uchun burchak bo'shlig'i
+  const a = Math.PI + d + (i + .5) / R.n * (2 * Math.PI - 2 * d);                                        // -x (darvoza) tomondan boshlab aylanadi
+  const jx = (Math.sin(j * 12.9898) * 43758.5453 % 1) * .7, jz = (Math.sin(j * 78.233) * 12543.123 % 1) * .7;
+  return { x: g.cx + Math.cos(a) * R.r + jx, z: Math.sin(a) * R.r + jz };
 }
 
 // O'tov joyi: o'rta ko'chaning ikki tomonida qatorlar, eshik o'rta ko'chaga qaragan

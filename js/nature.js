@@ -22,7 +22,7 @@ export function buildTerrain(scene, info, old) {
     const x = p.getX(i), z = p.getZ(i), h = heightAt(x, z); p.setY(i, h - .02);
     const n = fbm(x * .02, z * .02) * .5 + .5, n2 = fbm(x * .005 + 3, z * .005) * .5 + .5;
     c.copy(g1).lerp(g2, n).lerp(dry, smooth(.6, .9, n2) * .5).lerp(rock, smooth(30, 80, h) * .7);
-    if (x > G.x0 && x < G.x0 + G.Dp && z > G.z0 && z < G.z0 + G.W) c.lerp(lush, .7);
+    if ((x - G.cx) ** 2 + z * z < G.R * G.R) c.lerp(lush, .7);
     const C = info.com; if (C && x > C.x0 && x < C.x0 + C.W && z > C.z0 && z < C.z0 + C.Dp) c.lerp(meadow, .55);
     cols.set([c.r, c.g, c.b], i * 3);
   }
@@ -152,7 +152,7 @@ export class Trees {
     this.byJ = new Map(this.list.map(t => [t.j, t]));
     // tuproq chuqurlari (hamma ekish joylarida)
     const holeG = (() => { const a = new THREE.CircleGeometry(.75, 14); a.rotateX(-Math.PI / 2); a.translate(0, .03, 0); const b = new THREE.RingGeometry(.75, .95, 14); b.rotateX(-Math.PI / 2); b.translate(0, .04, 0); return merge([part(a, '#4a3423'), part(b, '#6b5238')]); })();
-    const NP = G.rows * G.cols; this.holes = inst(holeG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), NP, { shadow: false });
+    const NP = G.slots; this.holes = inst(holeG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), NP, { shadow: false });
     for (let j = 0; j < NP; j++) { const p = treePos(j, G); this.holes.setMatrixAt(j, compose(p.x, 0, p.z, 0)); }
     this.holes.count = NP; this.scene.add(this.holes); this.nearSet = new Set();
   }
@@ -176,8 +176,10 @@ export class Trees {
 // ---------- Layklar bog'i: panjara + darvoza ----------
 export function buildGarden(info) {
   const G = info.garden, g = new THREE.Group(), P = [];
-  const x0 = G.x0, x1 = G.x0 + G.Dp, z0 = G.z0, z1 = G.z0 + G.W, gate = 7;
-  const segs = [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, gate / 2], [x0, -gate / 2, x0, z0]];
+  const x0 = G.x0, z0 = G.z0, gate = 7;
+  // aylana panjara: darvoza (-x tomonda) uchun bo'shliq qoldiriladi
+  const segs = [], da = gate / 2 / G.R, NS = Math.max(24, Math.round(2 * Math.PI * G.R / 7.5));
+  for (let i = 0; i < NS; i++) { const a0 = Math.PI + da + i / NS * (2 * Math.PI - 2 * da), a1 = Math.PI + da + (i + 1) / NS * (2 * Math.PI - 2 * da); segs.push([G.cx + Math.cos(a0) * G.R, Math.sin(a0) * G.R, G.cx + Math.cos(a1) * G.R, Math.sin(a1) * G.R]); }
   for (const [ax, az, bx, bz] of segs) {
     const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 2.5)), ry = Math.atan2(bx - ax, bz - az);
     for (let i = 0; i <= n; i++) { const t = i / n; P.push(box(.14, 1.6, .14, ax + (bx - ax) * t, 0, az + (bz - az) * t, '#2c3b2e')); }
@@ -185,13 +187,13 @@ export function buildGarden(info) {
     for (let i = 0; i < n * 6; i++) { const t = (i + .5) / (n * 6); P.push(box(.03, 1.25, .03, ax + (bx - ax) * t, .25, az + (bz - az) * t, '#3b4d3d')); }
   }
   // ichki yo'lak
-  P.push(box(G.Dp, .04, 2.2, x0 + G.Dp / 2, 0, 0, '#b7a37c'));
+  P.push(box(G.R, .04, 2.6, x0 + G.R / 2, 0, 0, '#b7a37c'), cyl(6, 6, .05, G.cx, 0, 0, '#b7a37c', 28), cyl(2.2, 2.4, .5, G.cx, 0, 0, '#cfc6b6', 20), cyl(1.9, 1.9, .06, G.cx, .5, 0, '#3fa9d6', 20));
   // darvoza arka
   P.push(box(.5, 4.6, .5, x0, 0, -gate / 2 - .3, '#2c3b2e'), box(.5, 4.6, .5, x0, 0, gate / 2 + .3, '#2c3b2e'), box(.6, .4, gate + 1.6, x0, 4.6, 0, '#2c3b2e'));
   const fence = new THREE.Mesh(merge(P), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .7, metalness: .3 })); fence.castShadow = true; fence.receiveShadow = true; g.add(fence);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.9), new THREE.MeshStandardMaterial({ map: signTex(['LAYKLAR SHAHARCHASI', 'har bir layk — bitta daraxt ❤'], { bg: '#24502d', border: '#f1d27a' }), side: THREE.DoubleSide }));
   sign.position.set(x0 - .1, 5.9, 0); sign.rotation.y = -Math.PI / 2; g.add(sign);
-  const pick = new THREE.Mesh(new THREE.PlaneGeometry(G.Dp, G.W).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ visible: false })); pick.position.set(x0 + G.Dp / 2, 3, z0 + G.W / 2); g.add(pick);
+  const pick = new THREE.Mesh(new THREE.CircleGeometry(G.R, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ visible: false })); pick.position.set(G.cx, 3, 0); g.add(pick);
   // skameykalar
   return g;
 }

@@ -60,6 +60,20 @@
   .plq.yurt{background:#fff6ec;border-color:#e7c9a5}
   .hrt{color:#e0245e}
 
+  /* jonli rejim: chat va o'yinchi niklari */
+  .onl{float:right;font-size:12px;font-weight:600;color:var(--acc);letter-spacing:0}
+  #chat{left:12px;top:12px;width:300px;max-width:calc(100vw - 24px);padding:8px 10px;display:none;z-index:5}
+  body.live:not([data-mode=top]) #chat{display:block}
+  body.live:not([data-mode=top]) #hud{display:none}
+  #chatHead{font-size:12px;color:var(--mut);margin-bottom:4px}
+  #chatLog{max-height:112px;overflow-y:auto;font-size:13px;line-height:1.35;word-break:break-word;touch-action:pan-y}
+  #chatLog b{color:var(--acc)} #chatLog .mine b{color:var(--gold)}
+  #chatF{display:flex;gap:6px;margin-top:6px} #chatF input{padding:8px 10px} #chatF button{padding:8px 12px}
+  .pn{position:absolute;left:0;top:0;display:none;text-align:center;white-space:nowrap;will-change:transform;font-size:12px}
+  .pn b{display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(10,20,14,.72);color:#fff;font-weight:600}
+  .pn q{display:none;quotes:none;width:max-content;max-width:220px;margin:0 auto 3px;padding:5px 9px;border-radius:10px;background:#fff;color:#111;white-space:normal;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .pn.say q{display:block}
+
   #cardBox{left:50%;bottom:76px;transform:translateX(-50%);width:min(360px,calc(100vw - 24px));padding:14px 16px;display:none}
   #card.on #cardBox{display:block}
   #cTitle{font-size:13px;color:var(--mut)}
@@ -90,6 +104,7 @@
     #joy{left:16px;bottom:84px;width:118px;height:118px}
     #enter,#exit{bottom:214px}
     #cardBox{bottom:70px}
+    #chat{left:10px;right:10px;width:auto;top:10px}#chatLog{max-height:78px}
     #adminBtn{top:auto;bottom:140px;right:10px}
     #admin{top:auto;bottom:190px;right:10px}
   }
@@ -100,7 +115,7 @@
 <div id="labels"></div>
 
 <div id="hud" class="card">
-  <h1>YERLIFE <span>Shaharcha</span></h1>
+  <h1>YERLIFE <span>Shaharcha</span><em class="onl" style="font-style:normal"></em></h1>
   <div class="stats">
     <div class="stat"><b id="nH">0</b><span>uylar (obunachilar)</span></div>
     <div class="stat"><b id="nT">0</b><span>daraxtlar (layklar)</span></div>
@@ -125,6 +140,11 @@
 <button id="jump" aria-label="Sakrash">⤒</button>
 <button id="enter" class="card gold"></button>
 <button id="exit" class="card pri">🚪 Tashqariga chiqish</button>
+<div id="chat" class="card">
+  <div id="chatHead">💬 Chat <span class="onl"></span></div>
+  <div id="chatLog"></div>
+  <form id="chatF"><input id="chatI" maxlength="120" placeholder="Xabar yozing… (Enter)" autocomplete="off"><button class="pri" aria-label="Yuborish">➤</button></form>
+</div>
 <div id="toast"></div>
 
 <button id="adminBtn" class="card" style="display:none">⚙️ Admin</button>
@@ -149,6 +169,8 @@
   <div class="row" style="margin-top:12px"><button id="aClose">Yopish</button></div>
 </div>
 
+<script>/* jonli server manzili (bo'sh bo'lsa — onlayn rejim o'chiq) */
+window.YERLIFE_LIVE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'ws://localhost:8787' : 'wss://yerlife-live.sardorbektursunov037.workers.dev';</script>
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",

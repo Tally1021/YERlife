@@ -5,18 +5,34 @@ import { isMobile, windUniform, strHash, rng, compose } from './util.js';
 import { cityInfo, slot, ensureSlots, ringR, ROAD, SIDE, MAHALLA, treePos, yurtPos } from './layout.js';
 import { Yurts, buildComTown } from './yurts.js';
 import { Extras } from './extras.js';
-import { buildCityHall, hokimTex } from './civic.js';
+import { buildCityHall, hokimTex, buildHallInterior } from './civic.js';
 import { Buildings, YardPool, DIMS, LEVEL_NAMES, setNightBuildings } from './buildings.js';
 import { buildTerrain, SkyBox, Clouds, Trees, buildGarden, bigTree } from './nature.js';
 import { buildRoads, buildLamps, buildMahallaSigns, buildStadium, Cars, setNightCity } from './city.js';
 import { Crowd, lookFor, makePlayer, animatePlayer } from './people.js';
 import { buildInterior, ROOM } from './interior.js';
+import { Live } from './live.js';
 
 const $ = (id) => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
 const ADMIN = Q.get('admin');
 const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 function toast(t, ms = 2600) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('on'), ms); }
+
+// ---------- jonli rejim: boshqa o'yinchilar va chat ----------
+const live = new Live({ url: window.YERLIFE_LIVE || '', labels: $('labels'), onChat: chatAdd, onCount: (n) => { for (const el of document.querySelectorAll('.onl')) el.textContent = n ? '🟢 ' + n + ' onlayn' : ''; } });
+if (live.ready) document.body.classList.add('live');
+let roomKey = 'o';
+function chatAdd(n, m, mine) {
+  const log = $('chatLog'), d = document.createElement('div'), b = document.createElement('b'); b.textContent = '@' + n + ': '; d.append(b, m); if (mine) d.className = 'mine';
+  log.appendChild(d); while (log.children.length > 40) log.firstChild.remove(); log.scrollTop = log.scrollHeight;
+}
+$('chatF').onsubmit = (e) => { e.preventDefault(); const i = $('chatI'); if (i.value.trim()) { if (live.chat(i.value)) i.value = ''; else toast('Chat hali ulanmadi'); } i.blur(); };
+function myName() { // "Men shu odamman" bo'lsa — o'sha nik, aks holda mehmon
+  if (me != null && residents[me]) return residents[me].n;
+  let g = ''; try { g = localStorage.getItem('yl_guest') || ''; if (!/^mehmon\d{4}$/.test(g)) { g = 'mehmon' + (1000 + Math.random() * 9000 | 0); localStorage.setItem('yl_guest', g); } } catch { g = 'mehmon' + (1000 + Math.random() * 9000 | 0); }
+  return g;
+}
 
 // ---------- renderer ----------
 const renderer = new THREE.WebGLRenderer({ antialias: !isMobile || devicePixelRatio < 2, powerPreference: 'high-performance' });
@@ -102,7 +118,9 @@ function build() {
 // ---------- to'qnashuv ----------
 const PR = .38; // o'yinchi radiusi
 function inStadium(x, z, pad = 0) { const s = W.st; const dx = (x - s.cx) / (s.ax + pad), dz = (z - s.cz) / (s.bz + pad); return dx * dx + dz * dz; }
+function stIn(x, z, pad = 0) { const s = W.st; const dx = (x - s.cx) / (s.iax + .7 + pad), dz = (z - s.cz) / (s.ibz + .8 + pad); return dx * dx + dz * dz; }
 function resolve(p) {
+  if (inSt) { const v = stIn(p.x, p.z, -PR); if (v > 1) { const k = 1 / Math.sqrt(v) * .998; p.x = W.st.cx + (p.x - W.st.cx) * k; p.z = W.st.cz + (p.z - W.st.cz) * k; } return; } // stadion ichida: faqat maydon chegarasi
   const list = obsGrid.get(key(p.x, p.z)) || [];
   for (const o of list) {
     if (o.t === 'c') { const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), m = o.r + PR; if (d < m && d > 1e-4) { p.x = o.x + dx / d * m; p.z = o.z + dz / d * m; } }
@@ -119,6 +137,7 @@ function resolve(p) {
   const v = inStadium(p.x, p.z, PR); if (v < 1) { const k = 1 / Math.sqrt(v) * 1.002; p.x = W.st.cx + (p.x - W.st.cx) * k; p.z = W.st.cz + (p.z - W.st.cz) * k; }
 }
 function blocked(x, y, z) {
+  if (inSt) { const v = stIn(x, z); return v > 1 && y < 1.6 + (Math.sqrt(v) - 1) * 19; } // tribunalar qiyaligi
   for (const o of obsGrid.get(key(x, z)) || []) {
     if (y > o.h) continue;
     if (o.t === 'c') { if (Math.hypot(x - o.x, z - o.z) < o.r + .2) return true; }
@@ -128,6 +147,7 @@ function blocked(x, y, z) {
 }
 
 // ---------- rejimlar ----------
+let inSt = false, spot = null; // inSt — o'yinchi stadion ichida; spot — yaqin maxsus eshik
 let mode = 'top', player = null, P = { x: 0, z: 12, rot: 0, phase: 0, moving: false, y: 0, vy: 0 }, camDist = 7, room = null, me = null;
 const keys = new Set(), joy = { x: 0, y: 0 };
 const cam = { yaw: 0, pitch: .4 }; let jumpQ = false; // Roblox uslubi: kamera sichqoncha/barmoq bilan aylanadi, personaj kameraga nisbatan yuradi
@@ -144,19 +164,33 @@ function setMode(m) {
   mode = m; document.body.dataset.mode = m;
   controls.enabled = m === 'top'; if (m !== 'top') document.activeElement?.blur?.();
   if (player) player.visible = m !== 'top';
-  if (m === 'top') { $('enter').classList.remove('on'); }
+  if (m === 'top') { inSt = false; $('enter').classList.remove('on'); $('exit').classList.remove('on'); }
 }
 function spawn(look, x, z, rot) {
   if (player) player.parent && player.parent.remove(player);
-  player = makePlayer(look); scene.add(player); P.x = x; P.z = z; P.rot = rot; P.y = P.vy = 0; cam.yaw = rot; cam.pitch = .4; camDist = 7;
+  inSt = false; player = makePlayer(look); scene.add(player); P.x = x; P.z = z; P.rot = rot; P.y = P.vy = 0; cam.yaw = rot; cam.pitch = .4; camDist = 7;
   setMode('walk'); camera.position.set(x - Math.sin(rot) * 9, 5, z - Math.cos(rot) * 9);
+  live.join(myName(), me != null && residents[me] ? Math.min(4, residents[me].l | 0) : 0);
 }
 function spawnAs(i) {
   const r = residents[i], s = slot(i); me = i;
   spawn(lookFor(r.n, r.l | 0), s.x + s.fx * 3.6, s.z + s.fz * 3.6, s.rot + Math.PI);
   closeCard(); toast('Siz endi @' + r.n + ' — uyingiz oldidasiz');
 }
-$('walk').onclick = () => { me = null; closeCard(); spawn(lookFor('mehmon'), 0, ringR(0) - ROAD / 2 - SIDE - 2, 0); toast(isMobile ? "Sayr: joystick — yurish, ekranni surish — aylanish, ⤒ — sakrash" : "Sayr: W A S D — yurish, sichqonchani bosib surish — aylanish, Space — sakrash, g'ildirak — yaqinlashtirish"); };
+// Sayr qayerdan boshlanadi: tanlangan uy/daraxt/o'tov/joy oldidan, bo'lmasa — kamera qarab turgan joydan
+function walkSpot() {
+  const k = card.kind, i = card.i;
+  if (k === 'uy' && alive(residents[i])) { const s = slot(i); return [s.x + s.fx * 3.6, s.z + s.fz * 3.6, s.rot + Math.PI]; }
+  if (k === 'daraxt' && alive(trees[i])) { const p = treePos(i, info.garden); return [p.x - 2.6, p.z, Math.PI / 2]; }
+  if (k === 'otov' && alive(comments[i])) { const p = yurtPos(i, info.com); return [p.x, p.z - 4.6, 0]; }
+  if (k === 'hokimiyat') { const H = info.hok; return [3, H.cz + H.d / 2 + 33, Math.PI]; }
+  if (k === 'stadion') { const s = info.st; return [s.cx + s.ax + 7, s.cz, -Math.PI / 2]; }
+  if (k === 'bog') { const g = info.garden; return [g.x0 - 5, 0, Math.PI / 2]; }
+  if (k === 'otovlar') return [0, info.com.z0 - 6, 0];
+  if (mode === 'top' && camera.position.distanceTo(controls.target) < 420) { const t = controls.target; return [t.x, t.z, Math.atan2(t.x - camera.position.x, t.z - camera.position.z)]; }
+  return [0, ringR(0) - ROAD / 2 - SIDE - 2, 0];
+}
+$('walk').onclick = () => { me = null; const [wx, wz, wr] = walkSpot(); closeCard(); clearHL(); spawn(lookFor('mehmon'), wx, wz, wr); for (let k = 0; k < 4; k++) { const p = { x: P.x, z: P.z }; resolve(p); P.x = p.x; P.z = p.z; } toast(isMobile ? "Sayr: joystick — yurish, ekranni surish — aylanish, ⤒ — sakrash" : "Sayr: W A S D — yurish, sichqonchani bosib surish — aylanish, Space — sakrash, g'ildirak — yaqinlashtirish"); };
 $('meBtn').onclick = () => {
   if (card.kind === 'uy') return spawnAs(card.i);
   const qv = $('q').value.trim().replace(/^@/, '').toLowerCase();
@@ -168,7 +202,7 @@ $('topBtn').onclick = () => { if (mode === 'room') exitRoom(); setMode('top'); t
 $('zin').onclick = () => zoom(.75); $('zout').onclick = () => zoom(1.33);
 function zoom(k) {
   if (mode === 'top') { const d = camera.position.clone().sub(controls.target); const nd = THREE.MathUtils.clamp(d.length() * k, 12, 4000); flyTo(controls.target.clone().add(d.setLength(nd)), controls.target, 350); }
-  else camDist = THREE.MathUtils.clamp(camDist * k, 2.2, mode === 'room' ? 6 : 40);
+  else camDist = THREE.MathUtils.clamp(camDist * k, 2.2, mode === 'room' ? (room.dim ? 10 : 6) : 40);
 }
 
 // joystick
@@ -178,7 +212,7 @@ jb.addEventListener('pointermove', (e) => { if (e.pointerId === jid) joyMove(e);
 const joyEnd = () => { jid = null; joy.x = joy.y = 0; jk.style.transform = 'translate(-50%,-50%)'; };
 jb.addEventListener('pointerup', joyEnd); jb.addEventListener('pointercancel', joyEnd);
 function joyMove(e) { const r = jb.getBoundingClientRect(), R = r.width / 2; let dx = e.clientX - r.left - R, dy = e.clientY - r.top - R; const l = Math.hypot(dx, dy); if (l > R) { dx *= R / l; dy *= R / l; } joy.x = dx / R; joy.y = dy / R; jk.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; }
-addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; keys.add(e.code); if (e.code === 'Space' && mode !== 'top') e.preventDefault(); if (e.code === 'KeyE') { if (mode === 'walk' && doorNear >= 0) enterRoom(doorNear); else if (mode === 'room' && nearExit) exitRoom(); } if (e.code === 'Escape' && mode === 'room') exitRoom(); });
+addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; keys.add(e.code); if (e.code === 'Space' && mode !== 'top') e.preventDefault(); if (e.code === 'Enter' && mode !== 'top' && live.ready) { e.preventDefault(); keys.clear(); $('chatI').focus(); return; } if (e.code === 'KeyE') { if (mode === 'walk') { if (spot === 'stOut') useExit(); else useEnter(); } else if (mode === 'room' && nearExit) exitRoom(); } if (e.code === 'Escape' && mode === 'room') exitRoom(); });
 addEventListener('keyup', (e) => keys.delete(e.code));
 
 function input() {
@@ -216,7 +250,8 @@ function updateWalk(dt) {
   P.vy -= 22 * dt; P.y += P.vy * dt; if (P.y <= 0) { P.y = 0; P.vy = 0; }
   if (mode === 'walk') { const p = { x: nx, z: nz }; resolve(p); P.x = p.x; P.z = p.z; }
   else { // xona ichida
-    let x = THREE.MathUtils.clamp(nx, -ROOM.w / 2 + .4, ROOM.w / 2 - .4), z = THREE.MathUtils.clamp(nz, -ROOM.d / 2 + .4, ROOM.d / 2 - .4);
+    const RM = room.dim || ROOM;
+    let x = THREE.MathUtils.clamp(nx, -RM.w / 2 + .4, RM.w / 2 - .4), z = THREE.MathUtils.clamp(nz, -RM.d / 2 + .4, RM.d / 2 - .4);
     for (const [a, b, c, d] of room.colliders) if (x > a - PR && x < c + PR && z > b - PR && z < d + PR) { const o = [x - (a - PR), c + PR - x, z - (b - PR), d + PR - z], m = Math.min(...o); if (m === o[0]) x = a - PR; else if (m === o[1]) x = c + PR; else if (m === o[2]) z = b - PR; else z = d + PR; }
     P.x = x; P.z = z;
   }
@@ -229,7 +264,7 @@ function updateWalk(dt) {
     camD.copy(want).sub(camT); const L = camD.length(); let ok = L;
     for (let s = .6; s <= L; s += .4) { const p = camT.clone().addScaledVector(camD, s / L); if (blocked(p.x, p.y, p.z)) { ok = Math.max(1.2, s - .5); break; } }
     want.copy(camT).addScaledVector(camD, ok / L);
-  } else { want.x = THREE.MathUtils.clamp(want.x, -ROOM.w / 2 + .25, ROOM.w / 2 - .25); want.z = THREE.MathUtils.clamp(want.z, -ROOM.d / 2 + .25, ROOM.d / 2 - .25); want.y = Math.min(want.y, ROOM.h - .25); }
+  } else { const RM = room.dim || ROOM; want.x = THREE.MathUtils.clamp(want.x, -RM.w / 2 + .25, RM.w / 2 - .25); want.z = THREE.MathUtils.clamp(want.z, -RM.d / 2 + .25, RM.d / 2 - .25); want.y = Math.min(want.y, RM.h - .25); }
   camera.position.lerp(want, 1 - Math.exp(-dt * 12));
   if (mode === 'room') camT.set(P.x + fx * 1.6, 1.15, P.z + fz * 1.6); // xonani ko'rish uchun oldinga qaraydi
   camera.lookAt(camT);
@@ -239,17 +274,31 @@ function updateWalk(dt) {
 // ---------- uy ichi ----------
 let doorNear = -1, nearExit = false, outsideFrom = null;
 function doorPos(i) { const s = slot(i), L = Math.min(4, residents[i].l | 0), dx = DIMS[L].doorX || 0; return [s.x + Math.cos(s.rot) * dx, s.z - Math.sin(s.rot) * dx]; }
-function enterRoom(i) {
-  const r = residents[i]; room = buildInterior(r.n, r.l | 0); outsideFrom = i;
-  room.scene.add(player); P.x = room.spawn.x; P.z = room.spawn.z; P.rot = Math.PI; P.y = P.vy = 0; cam.yaw = Math.PI; cam.pitch = .25; camDist = 2.6; setMode('room');
-  camera.position.set(0, 2.2, ROOM.d / 2 - .3); $('enter').classList.remove('on'); toast('@' + r.n + ' uyidasiz');
+function goRoom(r, back, msg, key) {
+  room = r; outsideFrom = back; roomKey = key; const RM = room.dim || ROOM;
+  room.scene.add(player); P.x = room.spawn.x; P.z = room.spawn.z; P.rot = Math.PI; P.y = P.vy = 0; cam.yaw = Math.PI; cam.pitch = .25; camDist = room.dim ? 4.5 : 2.6; setMode('room');
+  camera.position.set(0, 2.2, RM.d / 2 - .3); $('enter').classList.remove('on'); toast(msg);
 }
+function enterRoom(i) { const r = residents[i], s = slot(i); goRoom(buildInterior(r.n, r.l | 0), { x: s.x + s.fx * 1.8, z: s.z + s.fz * 1.8, rot: s.rot }, '@' + r.n + ' uyidasiz', 'u' + i); }
+function enterHall() { const H = info.hok; goRoom(buildHallInterior(hokim), { x: 0, z: H.cz + H.d / 2 + 9.6, rot: 0 }, hokim ? '🏛️ Hokimiyat — hokim @' + hokim + ' qabulxonasi' : '🏛️ Hokimiyat binosidasiz', 'h'); }
 function exitRoom() {
-  if (!room) return; const i = outsideFrom, s = slot(i); room = null; scene.add(player);
-  P.x = s.x + s.fx * 1.8; P.z = s.z + s.fz * 1.8; P.rot = s.rot; P.y = P.vy = 0; cam.yaw = s.rot; cam.pitch = .4; camDist = 7; setMode('walk'); $('exit').classList.remove('on');
+  if (!room) return; const b = outsideFrom; room = null; scene.add(player);
+  P.x = b.x; P.z = b.z; P.rot = b.rot; P.y = P.vy = 0; cam.yaw = b.rot; cam.pitch = .4; camDist = 7; setMode('walk'); $('exit').classList.remove('on');
 }
-$('enter').onclick = () => doorNear >= 0 && enterRoom(doorNear);
-$('exit').onclick = exitRoom;
+// stadion: darvozadan maydonga kirish va chiqish (shu sahnaning o'zida)
+function enterStadium() { const s = info.st; inSt = true; P.x = s.cx + s.iax - 3; P.z = s.cz; P.rot = cam.yaw = -Math.PI / 2; P.y = P.vy = 0; cam.pitch = .35; camDist = 9; camera.position.set(P.x + 7, 5, P.z); $('enter').classList.remove('on'); toast('🏟️ YERLIFE ARENA — maydondasiz ⚽'); }
+function exitStadium() { const s = info.st; inSt = false; P.x = s.cx + s.ax + 3; P.z = s.cz; P.rot = cam.yaw = Math.PI / 2; P.y = P.vy = 0; camDist = 7; camera.position.set(P.x - 7, 5, P.z); $('exit').classList.remove('on'); }
+function spotNear() {
+  const H = info.hok, s = info.st;
+  if (inSt) return Math.hypot(P.x - (s.cx + s.iax), P.z - s.cz) < 3.6 ? 'stOut' : null;
+  if (Math.hypot(P.x, P.z - (H.cz + H.d / 2 + 8.6)) < 4.5) return 'hall';
+  if (Math.hypot(P.x - (s.cx + s.ax + 1), P.z - s.cz) < 4.5) return 'stIn';
+  return null;
+}
+function useEnter() { if (spot === 'hall') enterHall(); else if (spot === 'stIn') enterStadium(); else if (doorNear >= 0) enterRoom(doorNear); }
+function useExit() { if (mode === 'room') exitRoom(); else if (inSt) exitStadium(); }
+$('enter').onclick = useEnter;
+$('exit').onclick = useExit;
 
 // ---------- yaqin atrof (LOD, personajlar, yozuvlar) ----------
 let nearRes = [], nearTrees = [], nearYurts = [], lastNear = 0;
@@ -450,15 +499,22 @@ function tick() {
   if ((tAcc += dt) > .35) { tAcc = 0; nearTick(); }
   // eshik yaqinligi
   if (mode === 'walk') {
-    doorNear = -1; let best = 9;
-    for (const i of nearRes.slice(0, 30)) { const [dx, dz] = doorPos(i), d = (dx - P.x) ** 2 + (dz - P.z) ** 2; if (d < best) { best = d; doorNear = i; } }
-    const b = $('enter'); if (doorNear >= 0) { b.textContent = '🚪 Kirish: @' + residents[doorNear].n + (isMobile ? '' : '  (E)'); b.classList.add('on'); } else b.classList.remove('on');
+    doorNear = -1; spot = spotNear(); const b = $('enter');
+    $('exit').classList.toggle('on', spot === 'stOut');
+    if (spot === 'hall' || spot === 'stIn') { b.textContent = (spot === 'hall' ? '🏛️ Hokimiyatga kirish' : '🏟️ Stadionga kirish') + (isMobile ? '' : '  (E)'); b.classList.add('on'); }
+    else if (inSt) b.classList.remove('on');
+    else {
+      let best = 9;
+      for (const i of nearRes.slice(0, 30)) { const [dx, dz] = doorPos(i), d = (dx - P.x) ** 2 + (dz - P.z) ** 2; if (d < best) { best = d; doorNear = i; } }
+      if (doorNear >= 0) { b.textContent = '🚪 Kirish: @' + residents[doorNear].n + (isMobile ? '' : '  (E)'); b.classList.add('on'); } else b.classList.remove('on');
+    }
   } else if (mode === 'room') { nearExit = Math.hypot(P.x - room.door.x, P.z - room.door.z) < 1.9; $('exit').classList.toggle('on', nearExit); }
   // soya kamerasi diqqat nuqtasiga ergashadi
   const f = mode === 'top' ? controls.target : player.position, ext = mode === 'top' ? THREE.MathUtils.clamp(camera.position.distanceTo(controls.target) * .55, 60, 420) : 45;
   const sd = night ? sky.moonDir : sky.sun; sunL.position.copy(f).addScaledVector(sd, 900); sunL.target.position.copy(f);
   const sc = sunL.shadow.camera; if (Math.abs(sc.right - ext) > ext * .1) { sc.left = sc.bottom = -ext; sc.right = sc.top = ext; sc.near = 100; sc.far = 2000; sc.updateProjectionMatrix(); }
   scene.fog.near = mode === 'top' ? camera.position.distanceTo(controls.target) * .9 : 160; scene.fog.far = scene.fog.near + (mode === 'top' ? 3000 : 700);
+  live.update(dt, mode === 'top' ? null : { x: P.x, z: P.z, r: P.rot, y: P.y, w: mode === 'room' ? roomKey : 'o' }, camera, mode === 'room' ? room.scene : scene);
   if (mode === 'room') renderer.render(room.scene, camera); else { renderer.render(scene, camera); labels(); }
   if (mode === 'room') for (const p of plq) p.style.display = 'none';
 }

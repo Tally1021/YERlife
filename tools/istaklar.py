@@ -20,16 +20,16 @@ def norm(t):
 
 # Bino peshtoqidagi yozuv (kasb / biznes istaklari). Tartib muhim: aniqroqlari oldin.
 SIGN = [
-    (r"masjid|maschid|masjd|msjid|machit|\bmajid\b|мачит|масжд|масжид|мечет", 'MASJID'),
+    (r"masjid|masjit|maschid|masjd|msjid|machit|makka|kaba|ka'ba|madina|\bmajid\b|мачит|масжд|масжид|мечет", 'MASJID'),
     (r"\bbank|\bbonk|банк", 'BANK'),
-    (r"game ?club|gamer|geym|ko?mp[yi]?u?ter ?(x|h)on|komputer hon|kampitur|\bgg\b", 'GAME CLUB'),
+    (r"game ?club|gamer|geym|ko?mp[yi]?u?ter ?(x|h)on|stream ?xona|strim ?xona|komputer hon|kampitur|\bgg\b", 'GAME CLUB'),
     (r"avt[oa] ?salon|mashina salon|авт[оа] ?салон|афтоа? ?салон|mers bazasi", 'AVTOSALON'),
     (r"uchastkavoy|pal[ie]t[si]*iya|politsiya|militsiya|полиц", 'POLITSIYA'), (r"biznes", 'BIZNES MARKAZI'),
     (r"qassob", 'QASSOBXONA'), (r"sartarosh", 'SARTAROSHXONA'),
-    (r"to'?y ?xona|туйхона", "TO'YXONA"), (r"shashlikxona", 'SHASHLIKXONA'), (r"restoran|ресторан|\bkafe", 'RESTORAN'),
+    (r"to'?y ?xona|туйхона", "TO'YXONA"), (r"shashlikxona", 'SHASHLIKXONA'), (r"choy ?xona", 'CHOYXONA'), (r"cafe|osh ?(x|h)ona|restoran|ресторан|\bkafe", 'RESTORAN'),
     (r"sport ?zal|sport akadem|sport qura|sport sevar", 'SPORT ZAL'), (r"maktab|maktan\b|школ", 'MAKTAB'), (r"kutubxona", 'KUTUBXONA'),
-    (r"stomatolog", 'STOMATOLOGIYA'), (r"shifoxona|kasalxona|bolnitsa", 'SHIFOXONA'),
-    (r"\bo'?fis\b|офис", 'OFIS'), (r"mehmonxona|гостиниц|гаснитс|\bhotel|\botel\b", 'MEHMONXONA'), (r"zavo'?[dt]\b|завод", 'ZAVOD'),
+    (r"stomatolog", 'STOMATOLOGIYA'), (r"shifoxona|kasalxona|bolnitsa|doktor ?xona|do'?xtir ?xona|klinika", 'SHIFOXONA'),
+    (r"\bo'?fis\b|офис", 'OFIS'), (r"mehmon ?xona|гостиниц|гаснитс|\bhotel|\botel\b", 'MEHMONXONA'), (r"zavo'?[dt]\b|завод", 'ZAVOD'),
     (r"tungi klub|night ?club", 'TUNGI KLUB'), (r"o'?quv markaz", "O'QUV MARKAZI"), (r"\bferma|\bfermer", 'FERMA'),
     (r"a[ei]r[oa]?port", 'AEROPORT'), (r"korzinka", 'KORZINKA'), (r"uzum market", 'UZUM MARKET'),
     (r"kiyim d[o'u]+k[oi]n", "KIYIM DO'KONI"), (r"telefon d[o'u]+k[oi]n", "TELEFON DO'KONI"), (r"skuter d[o'u]+k[oi]n", "SKUTER DO'KONI"),
@@ -47,7 +47,7 @@ def parse(t):
     if re.search(r"villa|vila\b|hashamat|shaxamat|dacha|katta hovli|kotta hovli|kattaa hovli|uchaska", t) and 'l' not in w: w['l'] = 1
     if re.search(r"basseyn|basen|bassen|baseyn|basein|bassien|basseн|бассейн", t): w['pool'] = 1
     if re.search(r"mushuk|mishuk|мушук|🐈|😸", t): w['cat'] = 1
-    if re.search(r"daraxt|derah|bog'|bogladi", t): w['tree'] = 1
+    if re.search(r"daraxt|derah|bog'|bogladi|park", t): w['tree'] = 1
     if re.search(r"d[o'u]+k[oi]n|magazin|magzin|магазин|market|savdo|targov", t): w['shop'] = 1
     for pat, name in SIGN:
         if re.search(pat, t):
@@ -57,7 +57,7 @@ def parse(t):
     if re.search(r"teskari", t): w['flip'] = 1
     if re.search(r"\d+ ?ta ot|chavondos", t): w['horse'] = 1
     if re.search(r"\bup mult", t): w['bal'] = 1
-    if re.search(r"stad[iy]?[oi]n|station|futbol+ ?(maydon|dupil)|fudbol+ ?maydon|darvozabon|futbol(ch|is)|fudbolch", t): w['pitch'] = 1
+    if re.search(r"stad[iy]?[oi]n|station|futbol+ ?(maydon|dupil)|fudbol+ ?maydon|darvozabon|futbol(ch|is)|fudbolch|bernabeu|camp ?nou|pol[iy]+a(li|si)?", t): w['pitch'] = 1
     if 'l' not in w:  # o'lcham so'zlari (qavat/qasr/vip aytilmagan bo'lsa)
         if re.search(r"bal[a]?d(roq)? ?(uy|bino|beno)|shishadan|[bp]ulut|ninora|eng baland|b[uo]r[cg]h? ?[hxf]al|бурч", t): w['l'] = 4
         elif re.search(r"saroy|сарай|сорой|saltanat|eng (katta|kotta|zo'?r|chiroyli|boy)|premium|qimmatbaho|[hx]ashama[td]", t): w['l'] = 3

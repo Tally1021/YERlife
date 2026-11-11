@@ -145,6 +145,11 @@ export function buildStadium(scene, info) {
     const lights = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 2.6), lm); lights.position.set(0, 31.1, .28); lights.rotation.x = .35;
     tw.add(pole, panel, lights); grp.add(tw);
   }
+  // kirish darvozasi (shahar tomonda, +x) va maydonga chiqish tunneli
+  { const gm = new THREE.Mesh(merge([box(1.6, 5.2, 8.4, st.ax + .2, 0, 0, '#e9e4da'), box(1.7, 4.2, 6.4, st.ax + .3, 0, 0, '#15181c'), box(2.4, .6, 9.4, st.ax + .4, 5.2, 0, '#f1c84b'),
+      box(5, 2.9, 5, st.iax + 3.2, 0, 0, '#d9d4ca'), box(5.2, 2.5, 4, st.iax + 3.1, 0, 0, '#15181c')]), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .8 })); gm.castShadow = true; grp.add(gm);
+    const ks = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.3), new THREE.MeshStandardMaterial({ map: signTex(['KIRISH'], { w: 512, h: 112, bg: '#1f4d2b', border: '#f1c84b', font: 'bold 80px system-ui' }) })); ks.position.set(st.ax + 1.25, 4.75, 0); ks.rotation.y = Math.PI / 2; grp.add(ks);
+    const cs = new THREE.Mesh(new THREE.PlaneGeometry(3.6, .8), new THREE.MeshStandardMaterial({ map: signTex(['CHIQISH'], { w: 512, h: 112, bg: '#7a1f1f', border: '#f1c84b', font: 'bold 80px system-ui' }) })); cs.position.set(st.iax + .55, 3.35, 0); cs.rotation.y = -Math.PI / 2; grp.add(cs); }
   // YERLIFE ARENA yozuvi (shahar tomonda, +x)
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(26, 5), new THREE.MeshStandardMaterial({ map: signTex(['YERLIFE ARENA'], { w: 1024, h: 196, bg: '#0f2a4a', border: '#f1c84b', font: 'bold 120px system-ui' }), emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide }));
   sign.material.emissiveMap = sign.material.map; nightMats.push([sign.material, .8]);

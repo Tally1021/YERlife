@@ -1,6 +1,7 @@
 // Hokimiyat: ustunli bino, gumbaz, bayroqlar, favvorali maydon, "Hokim" taxtasi
 import * as THREE from 'three';
 import { box, cyl, cone, merge, part, canvasTex, signTex } from './util.js';
+import { makePlayer, lookFor } from './people.js';
 
 function flagTex() {
   return canvasTex(192, 96, (g, w, h) => {
@@ -74,4 +75,49 @@ export function buildCityHall(info, hokim) {
 }
 export function hokimTex(hokim) {
   return signTex(['HOKIM', hokim ? '@' + hokim : '??? — videoda aniqlanadi'], { bg: '#1b1b1f', border: '#e6c25a', w: 768, h: 288, font: 'bold 110px system-ui' });
+}
+
+// Hokimiyat ichi: qabul zali — qizil gilam, hokim stoli va o'zi, bayroqlar, majlis stollari
+export function buildHallInterior(hokim) {
+  const W = 18, Dp = 14, H = 5, scene = new THREE.Scene(); scene.background = new THREE.Color(0x1c1a17);
+  scene.add(new THREE.HemisphereLight(0xfff4e0, 0x6b5a48, 1.25));
+  for (const z of [-3, 3]) { const pl = new THREE.PointLight(0xffe2b0, 60, 26, 1.5); pl.position.set(0, H - .7, z); scene.add(pl); }
+  const std = (o) => new THREE.MeshStandardMaterial({ roughness: .8, ...o });
+  const marble = canvasTex(256, 256, (g, w, h) => { for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = (x + y) % 2 ? '#e9e3d6' : '#cfc6b4'; g.fillRect(x * 64, y * 64, 64, 64); } g.strokeStyle = 'rgba(120,105,80,.35)'; g.lineWidth = 2; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, h); g.moveTo(0, i * 64); g.lineTo(w, i * 64); g.stroke(); } }, { repeat: [5, 4] });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, Dp).rotateX(-Math.PI / 2), std({ map: marble, roughness: .35 })); floor.receiveShadow = true; scene.add(floor);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, Dp).rotateX(Math.PI / 2), std({ color: 0xf6f2ea })); ceil.position.y = H; scene.add(ceil);
+  const wm = std({ color: 0xf1e8d4, side: THREE.BackSide }), no = std({ visible: false });
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(W, H, Dp), [wm, wm, no, no, wm, wm]); walls.position.y = H / 2; scene.add(walls);
+  const wood = '#4a2c16', gold = '#d4a93a', P = [];
+  // panellar, plintus, karniz
+  P.push(box(W, 1.1, .08, 0, 0, -Dp / 2 + .04, wood), box(.08, 1.1, Dp, -W / 2 + .04, 0, 0, wood), box(.08, 1.1, Dp, W / 2 - .04, 0, 0, wood), box(W, .12, .1, 0, 1.1, -Dp / 2 + .05, gold), box(.1, .12, Dp, -W / 2 + .05, 1.1, 0, gold), box(.1, .12, Dp, W / 2 - .05, 1.1, 0, gold));
+  P.push(box(W, .2, .12, 0, H - .35, -Dp / 2 + .06, gold), box(.12, .2, Dp, -W / 2 + .06, H - .35, 0, gold), box(.12, .2, Dp, W / 2 - .06, H - .35, 0, gold));
+  // ustunlar
+  for (const x of [-W / 2 + .7, W / 2 - .7]) for (const z of [-Dp / 2 + .7, 0, Dp / 2 - .7]) P.push(cyl(.3, .34, H - .6, x, .3, z, '#fbf7ee', 14), box(.9, .3, .9, x, 0, z, '#e2d8c3'), box(.9, .3, .9, x, H - .3, z, '#e2d8c3'));
+  // eshik (+z devor)
+  P.push(box(2.6, 3.4, .1, 0, 0, Dp / 2 - .06, '#5a3a22'), box(3, .16, .14, 0, 3.4, Dp / 2 - .07, gold), box(.06, 3.4, .12, 0, 0, Dp / 2 - .12, '#3a2412'));
+  // hokim stoli, kreslo
+  P.push(box(4.2, .12, 1.7, 0, .86, -4.3, wood), box(4, .86, .1, 0, 0, -3.55, wood), box(.1, .86, 1.5, -1.95, 0, -4.3, wood), box(.1, .86, 1.5, 1.95, 0, -4.3, wood), box(3.6, .5, .04, 0, .2, -3.49, gold));
+  P.push(box(1.1, .5, 1, 0, 0, -6.1, '#6b1d2a'), box(1.1, 1.5, .22, 0, .5, -6.55, '#6b1d2a'), box(.18, .35, 1, -.62, .5, -6.1, '#4a1420'), box(.18, .35, 1, .62, .5, -6.1, '#4a1420'));
+  P.push(box(.7, .04, .5, -1.1, .98, -4.3, '#f4f1ea'), box(.5, .32, .04, 1.1, .98, -4.5, '#15181c'), box(.3, .04, .2, 1.1, .98, -4.35, '#3b3b3b'), cyl(.07, .09, .22, -.3, .98, -4.0, gold, 10));
+  // majlis stollari va stullar
+  for (const s of [-1, 1]) {
+    P.push(box(1.7, .1, 5.6, s * 5.6, .78, .4, wood), box(1.3, .78, 5.2, s * 5.6, 0, .4, '#3a2412'));
+    for (let k = 0; k < 4; k++) for (const o of [-1, 1]) { const cx = s * 5.6 + o * 1.35, cz = -1.7 + k * 1.4; P.push(box(.6, .48, .6, cx, 0, cz, '#7a5230'), box(.1, .6, .6, cx + o * .28, .48, cz, '#7a5230')); }
+  }
+  // bayroq ustunlari, qandil
+  for (const x of [-3.3, 3.3]) P.push(cyl(.05, .05, 3.6, x, 0, -6.3, '#d0d4d8', 8), cyl(.28, .34, .16, x, 0, -6.3, gold, 12));
+  P.push(cyl(.03, .03, .9, 0, H - .9, 0, gold, 6), cyl(.9, .5, .3, 0, H - 1.2, 0, gold, 16), cyl(.6, .3, .25, 0, H - 1.45, 0, '#fff3c4', 16));
+  const furn = new THREE.Mesh(merge(P), std({ vertexColors: true })); furn.castShadow = furn.receiveShadow = true; scene.add(furn);
+  // qizil gilam
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 9.6).rotateX(-Math.PI / 2), std({ color: 0x9c1c26 })); rug.position.set(0, .012, 1.9); scene.add(rug);
+  for (const x of [-1.22, 1.22]) { const e = new THREE.Mesh(new THREE.PlaneGeometry(.12, 9.6).rotateX(-Math.PI / 2), std({ color: 0xe6c25a })); e.position.set(x, .016, 1.9); scene.add(e); }
+  // bayroqlar, yozuv, hokimning o'zi
+  const ft = flagTex();
+  for (const x of [-3.3, 3.3]) { const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.7, .85), std({ map: ft, side: THREE.DoubleSide })); fl.position.set(x + (x < 0 ? .9 : -.9), 3.1, -6.3); scene.add(fl); }
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 2.4), std({ map: signTex(['YERLIFE HOKIMI', hokim ? '@' + hokim : '??? — videoda aniqlanadi'], { bg: '#163a5f', border: '#e6c25a', w: 1024, h: 384, font: 'bold 110px system-ui' }) })); sign.position.set(0, 3.45, -Dp / 2 + .07); scene.add(sign);
+  for (const s of [-1, 1]) { const fr = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.5), std({ map: signTex(s < 0 ? ['Xalq bilan', 'birga!'] : ['Shaharcha', 'obod bo\u2018lsin!'], { bg: '#fbf6ea', fg: '#3b2a1a', border: '#7a5230', w: 640, h: 288, font: 'bold 84px Georgia, serif' }) })); fr.position.set(s * (W / 2 - .09), 2.7, .4); fr.rotation.y = -s * Math.PI / 2; scene.add(fr); }
+  if (hokim) { const hk = makePlayer(lookFor(hokim, 4)); hk.userData.mark.visible = false; hk.position.set(0, 0, -5.25); scene.add(hk); }
+  const colliders = [[-2.2, -6.8, 2.2, -3.4], [3.9, -2.6, 7.3, 3.4], [-7.3, -2.6, -3.9, 3.4], [-3.6, -6.6, -3.0, -6.0], [3.0, -6.6, 3.6, -6.0]];
+  return { scene, colliders, dim: { w: W, d: Dp, h: H }, spawn: new THREE.Vector3(0, 0, Dp / 2 - 2.4), door: new THREE.Vector3(0, 0, Dp / 2 - .2) };
 }

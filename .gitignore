@@ -4,3 +4,5 @@ data.backup*.json
 data.json.tmp
 *.bak
 node_modules/
+.izohlar*.json
+.wrangler/

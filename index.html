@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="color-scheme" content="light dark">
+<title>YERLIFE Shaharcha</title>
+<style>
+  :root{--glass:rgba(16,26,20,.62);--line:rgba(255,255,255,.16);--txt:#f4f7f0;--mut:#bccab8;--acc:#8fd46d;--gold:#e8c35a}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#cfdbe3;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);touch-action:none;user-select:none;-webkit-user-select:none}
+  body.night{background:#0b1426}
+  canvas{display:block}
+  .card{position:fixed;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 36px rgba(0,0,0,.28)}
+  button{font:inherit;color:var(--txt);background:rgba(255,255,255,.1);border:1px solid var(--line);border-radius:12px;padding:10px 14px;cursor:pointer}
+  button:hover{background:rgba(255,255,255,.18)}
+  button.pri{background:#4f9a37;border-color:#77bd59}
+  button.gold{background:linear-gradient(#e9c65e,#c79b2c);color:#1d1606;border-color:#f3dc8c;font-weight:700}
+  input,textarea,select{font:inherit;color:var(--txt);background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:none;width:100%}
+  input:focus,textarea:focus{border-color:var(--acc)}
+  select option{color:#111}
+
+  #hud{top:12px;left:12px;padding:12px 14px;width:300px;max-width:calc(100vw - 24px)}
+  #hud h1{margin:0;font-size:18px;letter-spacing:.4px}
+  #hud h1 span{color:var(--acc)}
+  .stats{display:flex;gap:8px;margin:10px 0}
+  .stat{flex:1;background:rgba(255,255,255,.07);border-radius:10px;padding:7px 10px}
+  .stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+  .stat span{font-size:11px;color:var(--mut)}
+  #res{display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:40vh;overflow:auto}
+  #res button{display:flex;align-items:center;gap:6px;text-align:left;padding:8px 10px;font-size:13px}
+  #res button span{margin-left:auto;color:var(--mut);font-size:12px}
+  #res .none{font-size:12px;color:var(--mut);padding:4px 2px}
+
+  #bar{left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:8px;padding:7px}
+  #bar button{white-space:nowrap;font-size:14px}
+  body[data-mode=top] #topBtn{display:none}
+  body:not([data-mode=top]) #walk,body:not([data-mode=top]) #meBtn{display:none}
+  #zoom{right:12px;bottom:84px;display:flex;flex-direction:column;gap:6px;padding:6px}
+  #zoom button{width:46px;height:46px;font-size:24px;padding:0;line-height:1}
+  #joy{position:fixed;left:22px;bottom:96px;width:128px;height:128px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.35);backdrop-filter:blur(6px);touch-action:none}
+  #joy::before{content:"▲";position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:12px;opacity:.6}
+  #joy::after{content:"▼";position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:12px;opacity:.6}
+  #knob{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.75);transform:translate(-50%,-50%);box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none}
+  body[data-mode=top] #joy{display:none}
+  #jump{position:fixed;right:22px;bottom:210px;width:72px;height:72px;border-radius:50%;font-size:30px;padding:0;background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.4);backdrop-filter:blur(6px);touch-action:none}
+  #jump:active{background:rgba(255,255,255,.4)}
+  body[data-mode=top] #jump{display:none}
+  #enter,#exit{left:50%;bottom:84px;transform:translateX(-50%);display:none;padding:13px 20px;font-size:16px;font-weight:600}
+  #enter.on,#exit.on{display:block}
+
+  #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  .plq{position:absolute;left:0;top:0;display:none;padding:3px 8px;border-radius:6px;background:#fbfaf6;color:#1e2a1e;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,.3);border:1px solid #d9d4c6;white-space:nowrap;text-align:center;will-change:transform}
+  .plq b{font-weight:700}
+  .plq i{font-style:normal;color:#7b8a76;margin-left:5px;font-size:10px}
+  .plq.gold{background:#14110b;color:#f6dd8c;border:2px solid var(--gold);padding:3px 10px}
+  .plq.gold small{display:block;font-size:9px;letter-spacing:1.5px;color:var(--gold);font-weight:800}
+  .plq.tree{background:#f3fbef;border-color:#bfe0b0}
+  .wish{margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.08);font-size:12px;line-height:1.35}
+  .plq.yurt{background:#fff6ec;border-color:#e7c9a5}
+  .hrt{color:#e0245e}
+
+  #cardBox{left:50%;bottom:76px;transform:translateX(-50%);width:min(360px,calc(100vw - 24px));padding:14px 16px;display:none}
+  #card.on #cardBox{display:block}
+  #cTitle{font-size:13px;color:var(--mut)}
+  #cNick{font-size:21px;font-weight:700;margin:2px 0;word-break:break-all}
+  #cInfo{font-size:13px;color:var(--mut);margin-bottom:10px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row button{flex:1}
+
+  #toast{position:fixed;left:50%;top:14px;transform:translate(-50%,-80px);transition:transform .25s;padding:10px 16px;border-radius:999px;background:rgba(36,70,28,.94);font-size:14px;border:1px solid rgba(255,255,255,.2);max-width:calc(100vw - 24px);text-align:center;z-index:20}
+  #toast.on{transform:translate(-50%,0)}
+  #loading{position:fixed;inset:0;display:grid;place-items:center;background:#cfdbe3;color:#2b3a29;font-size:16px;z-index:30;transition:opacity .5s}
+  body.night #loading{background:#0b1426;color:#cfd8ea}
+  #loading.off{opacity:0;pointer-events:none}
+
+  #adminBtn{position:fixed;right:12px;top:12px}
+  #admin{right:12px;top:60px;width:min(380px,calc(100vw - 24px));padding:14px;display:none;max-height:calc(100vh - 150px);overflow:auto;z-index:15}
+  #admin.on{display:block}
+  #admin h3{margin:0 0 8px;font-size:15px}
+  #admin label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
+  #admin textarea{height:96px;resize:vertical}
+  #admin hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+
+  @media (max-width:640px){
+    #hud{left:10px;right:10px;width:auto;top:10px;padding:10px 12px}
+    #hud h1{font-size:16px}.stat b{font-size:17px}.stats{margin:8px 0}
+    #bar{bottom:10px;padding:6px;gap:6px}#bar button{font-size:13px;padding:10px 11px}
+    #zoom{right:10px;bottom:76px}
+    #joy{left:16px;bottom:84px;width:118px;height:118px}
+    #enter,#exit{bottom:214px}
+    #cardBox{bottom:70px}
+    #adminBtn{top:auto;bottom:140px;right:10px}
+    #admin{top:auto;bottom:190px;right:10px}
+  }
+</style>
+</head>
+<body data-mode="top">
+<div id="loading">YERLIFE shaharchasi qurilmoqda…</div>
+<div id="labels"></div>
+
+<div id="hud" class="card">
+  <h1>YERLIFE <span>Shaharcha</span></h1>
+  <div class="stats">
+    <div class="stat"><b id="nH">0</b><span>uylar (obunachilar)</span></div>
+    <div class="stat"><b id="nT">0</b><span>daraxtlar (layklar)</span></div>
+    <div class="stat"><b id="nC">0</b><span>o'tovlar (izohlar)</span></div>
+  </div>
+  <input id="q" placeholder="🔎 Nik bo'yicha qidirish (uy yoki daraxt)…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div id="res"></div>
+</div>
+
+<div id="card"><div id="cardBox" class="card">
+  <div id="cTitle"></div><div id="cNick"></div><div id="cInfo"></div>
+  <div class="row"><button id="cCopy">🔗 Havolani nusxalash</button><button id="cMe" class="pri">🧍 Men shu odamman</button><button id="cClose">✕</button></div>
+</div></div>
+
+<div id="bar" class="card">
+  <button id="walk">🚶 Sayr</button>
+  <button id="meBtn" class="pri">🧍 Men shu odamman</button>
+  <button id="topBtn">🗺️ Tepadan ko'rish</button>
+</div>
+<div id="zoom" class="card"><button id="zin" aria-label="Yaqinlashtirish">+</button><button id="zout" aria-label="Uzoqlashtirish">−</button></div>
+<div id="joy"><div id="knob"></div></div>
+<button id="jump" aria-label="Sakrash">⤒</button>
+<button id="enter" class="card gold"></button>
+<button id="exit" class="card pri">🚪 Tashqariga chiqish</button>
+<div id="toast"></div>
+
+<button id="adminBtn" class="card" style="display:none">⚙️ Admin</button>
+<div id="admin" class="card">
+  <h3>⚙️ Admin paneli</h3>
+  <label>Turi</label>
+  <select id="aKind"><option value="res">Obunachi → uy</option><option value="tree">Layk → daraxt</option><option value="com">Izoh → o'tov</option></select>
+  <label>Niklar (har qatorga bittadan, takrorlanganlari o'tkazib yuboriladi)</label>
+  <textarea id="aNames" placeholder="nik1&#10;nik2"></textarea>
+  <div class="row" style="margin-top:8px"><button id="aAdd" class="pri">➕ Qo'shish</button></div>
+  <label>Izohga tayyor javoblar</label>
+  <textarea id="aOut" readonly></textarea>
+  <div class="row" style="margin-top:8px"><button id="aCopy">📋 Hammasini nusxalash</button></div>
+  <hr>
+  <label>Nik</label>
+  <input id="aNick" placeholder="@nik">
+  <label>Uy darajasi</label>
+  <select id="aLevel"><option value="0">0 — Uy</option><option value="1">1 — Ikki qavatli</option><option value="2">2 — Ko'p qavatli</option><option value="3">3 — Qasr</option><option value="4">4 — VIP minora</option></select>
+  <div class="row" style="margin-top:8px"><button id="aLvl" class="pri">Darajani o'zgartirish</button><button id="aDel">🗑️ O'chirish</button></div>
+  <div class="row" style="margin-top:8px"><button id="aHokim">🏛️ Shu nikni hokim qilish</button></div>
+  <div class="row" style="margin-top:8px"><input id="aLikes" type="number" placeholder="Jami layklar soni"><button id="aLikesBtn">🌳 Daraxtlarni yangilash</button></div>
+  <div class="row" style="margin-top:12px"><button id="aClose">Yopish</button></div>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

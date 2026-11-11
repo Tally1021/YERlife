@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="uz"><head><meta charset="utf-8"><title>Qabul qilish</title>
+<style>body{font-family:system-ui;background:#1d2a20;color:#eee;display:grid;place-items:center;height:100vh;margin:0}</style></head>
+<body><div id="s">Instagram'dan ma'lumot kutilmoqda…</div>
+<script>
+// Instagram sahifasidan postMessage orqali obunachilar ro'yxatini qabul qilib, serverga saqlaydi
+addEventListener('message', async (e) => {
+  if (e.origin !== 'https://www.instagram.com' || !e.data || !(Array.isArray(e.data.followers) || Array.isArray(e.data.likers) || Array.isArray(e.data.commenters) || Array.isArray(e.data.raw))) return;
+  const r = await fetch('/api/followers', { method: 'POST', body: JSON.stringify(e.data) });
+  const t = await r.text(); document.getElementById('s').textContent = 'Saqlandi: ' + t;
+  e.source.postMessage({ ok: true, result: t }, e.origin);
+});
+if (window.opener) window.opener.postMessage({ ready: true }, 'https://www.instagram.com');
+</script></body></html>

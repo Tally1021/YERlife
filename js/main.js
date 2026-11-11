@@ -22,14 +22,16 @@ function toast(t, ms = 2600) { const el = $('toast'); el.textContent = t; el.cla
 // ---------- jonli rejim: boshqa o'yinchilar va chat ----------
 const live = new Live({ url: window.YERLIFE_LIVE || '', labels: $('labels'), onChat: chatAdd, onCount: (n) => { for (const el of document.querySelectorAll('.onl')) el.textContent = n ? '🟢 ' + n + ' onlayn' : ''; } });
 if (live.ready) document.body.classList.add('live');
-let roomKey = 'o';
+let roomKey = 'o', myNick = '', myIdx = null; // myNick — kirishda yozilgan nik; myIdx — uyi bo'lsa, aholi raqami
+const selfLab = document.createElement('div'); selfLab.className = 'pn me'; selfLab.innerHTML = '<q></q><b></b>'; $('labels').appendChild(selfLab); let selfSay = 0;
 function chatAdd(n, m, mine) {
-  const log = $('chatLog'), d = document.createElement('div'), b = document.createElement('b'); b.textContent = '@' + n + ': '; d.append(b, m); if (mine) d.className = 'mine';
+  const log = $('chatLog'), d = document.createElement('div'), b = document.createElement('b'); b.textContent = '@' + n + ': '; d.append(b, m); if (mine) { d.className = 'mine'; selfLab.firstChild.textContent = m; selfLab.classList.add('say'); selfSay = performance.now() + 7000; }
   log.appendChild(d); while (log.children.length > 40) log.firstChild.remove(); log.scrollTop = log.scrollHeight;
 }
 $('chatF').onsubmit = (e) => { e.preventDefault(); const i = $('chatI'); if (i.value.trim()) { if (live.chat(i.value)) i.value = ''; else toast('Chat hali ulanmadi'); } i.blur(); };
 function myName() { // "Men shu odamman" bo'lsa — o'sha nik, aks holda mehmon
   if (me != null && residents[me]) return residents[me].n;
+  if (myNick) return myNick;
   let g = ''; try { g = localStorage.getItem('yl_guest') || ''; if (!/^mehmon\d{4}$/.test(g)) { g = 'mehmon' + (1000 + Math.random() * 9000 | 0); localStorage.setItem('yl_guest', g); } } catch { g = 'mehmon' + (1000 + Math.random() * 9000 | 0); }
   return g;
 }
@@ -173,7 +175,7 @@ function spawn(look, x, z, rot) {
   live.join(myName(), me != null && residents[me] ? Math.min(4, residents[me].l | 0) : 0);
 }
 function spawnAs(i) {
-  const r = residents[i], s = slot(i); me = i;
+  const r = residents[i], s = slot(i); me = myIdx = i; myNick = r.n; try { localStorage.setItem('yl_nick', r.n); } catch { }
   spawn(lookFor(r.n, r.l | 0), s.x + s.fx * 3.6, s.z + s.fz * 3.6, s.rot + Math.PI);
   closeCard(); toast('Siz endi @' + r.n + ' — uyingiz oldidasiz');
 }
@@ -190,7 +192,7 @@ function walkSpot() {
   if (mode === 'top' && camera.position.distanceTo(controls.target) < 420) { const t = controls.target; return [t.x, t.z, Math.atan2(t.x - camera.position.x, t.z - camera.position.z)]; }
   return [0, ringR(0) - ROAD / 2 - SIDE - 2, 0];
 }
-$('walk').onclick = () => { me = null; const [wx, wz, wr] = walkSpot(); closeCard(); clearHL(); spawn(lookFor('mehmon'), wx, wz, wr); for (let k = 0; k < 4; k++) { const p = { x: P.x, z: P.z }; resolve(p); P.x = p.x; P.z = p.z; } toast(isMobile ? "Sayr: joystick — yurish, ekranni surish — aylanish, ⤒ — sakrash" : "Sayr: W A S D — yurish, sichqonchani bosib surish — aylanish, Space — sakrash, g'ildirak — yaqinlashtirish"); };
+$('walk').onclick = () => { me = myIdx != null && alive(residents[myIdx]) ? myIdx : null; const [wx, wz, wr] = walkSpot(); closeCard(); clearHL(); spawn(me != null ? lookFor(residents[me].n, residents[me].l | 0) : lookFor(myNick || 'mehmon'), wx, wz, wr); for (let k = 0; k < 4; k++) { const p = { x: P.x, z: P.z }; resolve(p); P.x = p.x; P.z = p.z; } toast(isMobile ? "Sayr: joystick — yurish, ekranni surish — aylanish, ⤒ — sakrash" : "Sayr: W A S D — yurish, sichqonchani bosib surish — aylanish, Space — sakrash, g'ildirak — yaqinlashtirish"); };
 $('meBtn').onclick = () => {
   if (card.kind === 'uy') return spawnAs(card.i);
   const qv = $('q').value.trim().replace(/^@/, '').toLowerCase();
@@ -198,6 +200,18 @@ $('meBtn').onclick = () => {
   const i = residents.findIndex(r => alive(r) && r.n.toLowerCase() === qv); if (i < 0) { toast('Bunday aholi topilmadi: ' + qv); return; }
   spawnAs(i);
 };
+// kirishda nik so'rash (majburiy): uyi bo'lsa — uyi oldidan, bo'lmasa — mehmon sifatida shu nik bilan
+function enterAs(v) {
+  v = String(v).trim().replace(/^@/, '');
+  if (!/^[\w.]{2,30}$/.test(v)) { $('nickE').textContent = "Nikni to'g'ri yozing: faqat harf, raqam, nuqta va _"; return; }
+  const i = residents.findIndex(r => alive(r) && r.n.toLowerCase() === v.toLowerCase());
+  $('nick').classList.remove('on'); $('nickI').blur(); try { localStorage.setItem('yl_nick', v); } catch { }
+  if (i >= 0) return spawnAs(i);
+  myNick = v; myIdx = me = null; const [wx, wz, wr] = walkSpot(); closeCard(); clearHL(); spawn(lookFor(v), wx, wz, wr);
+  toast('@' + v + ", sizda hali uy yo'q — obuna bo'lsangiz, uyingiz quriladi 🏠", 6000);
+}
+$('nickF').onsubmit = (e) => { e.preventDefault(); enterAs($('nickI').value); };
+function askNick() { let sv = ''; try { sv = localStorage.getItem('yl_nick') || ''; } catch { } $('nickI').value = sv; $('nickE').textContent = ''; $('nick').classList.add('on'); if (!isMobile) $('nickI').focus(); }
 $('topBtn').onclick = () => { if (mode === 'room') exitRoom(); setMode('top'); topView(); };
 $('zin').onclick = () => zoom(.75); $('zout').onclick = () => zoom(1.33);
 function zoom(k) {
@@ -514,6 +528,11 @@ function tick() {
   const sd = night ? sky.moonDir : sky.sun; sunL.position.copy(f).addScaledVector(sd, 900); sunL.target.position.copy(f);
   const sc = sunL.shadow.camera; if (Math.abs(sc.right - ext) > ext * .1) { sc.left = sc.bottom = -ext; sc.right = sc.top = ext; sc.near = 100; sc.far = 2000; sc.updateProjectionMatrix(); }
   scene.fog.near = mode === 'top' ? camera.position.distanceTo(controls.target) * .9 : 160; scene.fog.far = scene.fog.near + (mode === 'top' ? 3000 : 700);
+  if (mode !== 'top' && player) { // o'z nikim bosh ustida
+    v3.set(P.x, P.y + 2.8, P.z).project(camera); const nm = '@' + myName(); if (selfLab._n !== nm) { selfLab._n = nm; selfLab.lastChild.textContent = nm; }
+    selfLab.style.display = v3.z < 1 ? 'block' : 'none'; selfLab.style.transform = `translate(${(v3.x * .5 + .5) * innerWidth}px,${(-v3.y * .5 + .5) * innerHeight}px) translate(-50%,-100%)`;
+    if (selfSay && now > selfSay) { selfSay = 0; selfLab.classList.remove('say'); }
+  } else selfLab.style.display = 'none';
   live.update(dt, mode === 'top' ? null : { x: P.x, z: P.z, r: P.rot, y: P.y, w: mode === 'room' ? roomKey : 'o' }, camera, mode === 'room' ? room.scene : scene);
   if (mode === 'room') renderer.render(room.scene, camera); else { renderer.render(scene, camera); labels(); }
   if (mode === 'room') for (const p of plq) p.style.display = 'none';
@@ -524,6 +543,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 (async () => {
   await loadData(); build(); setMode('top'); topView(true);
   $('loading').classList.add('off'); tick();
+  if (!Q.get('demo')) askNick();
   if (location.hash) setTimeout(readHash, 300);
   setInterval(async () => { if (await loadData()) build(); }, 30000);
 })();

@@ -73,6 +73,15 @@
   .pn b{display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(10,20,14,.72);color:#fff;font-weight:600}
   .pn q{display:none;quotes:none;width:max-content;max-width:220px;margin:0 auto 3px;padding:5px 9px;border-radius:10px;background:#fff;color:#111;white-space:normal;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
   .pn.say q{display:block}
+  .pn.me b{background:rgba(46,110,34,.9)}
+  #nick{position:fixed;inset:0;display:none;place-items:center;background:rgba(8,14,10,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:25;padding:16px}
+  #nick.on{display:grid}
+  #nickF{position:static;width:min(380px,100%);padding:20px 18px;text-align:center}
+  #nickF h2{margin:0 0 6px;font-size:22px} #nickF h2 span{color:var(--acc)}
+  #nickF p{margin:0 0 14px;font-size:14px;color:var(--mut);line-height:1.4}
+  #nickF input{font-size:18px;text-align:center;padding:12px;user-select:text;-webkit-user-select:text}
+  #nickE{min-height:18px;margin:6px 0;font-size:12px;color:#ffb3a8}
+  #nickF button{width:100%;font-size:17px;font-weight:700;padding:13px}
 
   #cardBox{left:50%;bottom:76px;transform:translateX(-50%);width:min(360px,calc(100vw - 24px));padding:14px 16px;display:none}
   #card.on #cardBox{display:block}
@@ -145,6 +154,13 @@
   <div id="chatLog"></div>
   <form id="chatF"><input id="chatI" maxlength="120" placeholder="Xabar yozing… (Enter)" autocomplete="off"><button class="pri" aria-label="Yuborish">➤</button></form>
 </div>
+<div id="nick"><form id="nickF" class="card">
+  <h2>YERLIFE <span>Shaharcha</span></h2>
+  <p>Instagram nikingizni yozing.<br>Uyingiz bo'lsa — o'z uyingiz oldidan boshlaysiz 🏠</p>
+  <input id="nickI" maxlength="31" placeholder="@nikingiz" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+  <div id="nickE"></div>
+  <button class="pri">Kirish ➜</button>
+</form></div>
 <div id="toast"></div>
 
 <button id="adminBtn" class="card" style="display:none">⚙️ Admin</button>

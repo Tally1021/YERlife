@@ -38,7 +38,7 @@ save(load()); // formatni yangilab qo'yish
 
 const clean = (s) => String(s || '').trim().replace(/^@/, '').slice(0, 60);
 function admin(body) {
-  if (!body || body.code !== env.ADMIN_CODE) return [403, { error: "Admin kodi noto'g'ri" }];
+  if (!body || !env.ADMIN_CODE || typeof body.code !== 'string' || body.code !== env.ADMIN_CODE) return [403, { error: "Admin kodi noto'g'ri" }];
   const d = load(), list = body.kind === 'tree' ? d.trees : body.kind === 'com' ? d.comments : d.residents;
   const idx = new Map(); list.forEach((x, i) => { if (x.n && !x.d) idx.set(x.n.toLowerCase(), i); });
   if (body.op === 'add') {
@@ -78,7 +78,8 @@ http.createServer((req, res) => {
   }
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname); if (p === '/') p = '/index.html';
   const f = path.join(DIR, path.normalize(p)), name = path.basename(f);
-  if (!f.startsWith(DIR) || name.startsWith('.') || name === 'server.js' || /\.(bat|md|tmp)$/.test(name)) { res.writeHead(404); return res.end(); }
+  // maxfiy/xizmat fayllari tashqariga berilmaydi: nuqtali fayllar, server kodi, zaxira nusxalar, tools papkasi
+  if (!f.startsWith(DIR) || name.startsWith('.') || name === 'server.js' || /\.(bat|md|tmp|bak|py)$/.test(name) || /backup/i.test(name) || /^tools([\\/]|$)/i.test(path.relative(DIR, f))) { res.writeHead(404); return res.end(); }
   fs.readFile(f, (err, buf) => {
     if (err) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); res.end(buf);
